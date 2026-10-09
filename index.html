@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mosaik – Fill-a-Pix</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 3 3%22%3E%3Crect width=%221%22 height=%221%22 fill=%22%231B2540%22/%3E%3Crect x=%222%22 width=%221%22 height=%221%22 fill=%22%231B2540%22/%3E%3Crect x=%221%22 y=%221%22 width=%221%22 height=%221%22 fill=%22%230E7472%22/%3E%3Crect y=%222%22 width=%223%22 height=%221%22 fill=%22%231B2540%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand" aria-label="Mosaik">
+      <span class="logo" aria-hidden="true"><i></i><i class="o"></i><i></i><i class="o"></i><i class="a"></i><i class="o"></i><i></i><i></i><i></i></span>
+      <span class="wordmark">Mosaik</span>
+    </div>
+    <div class="meta"><h1 id="pTitle">–</h1><span id="pSub"></span><span class="level" id="pLevel" hidden></span></div>
+    <div class="stats">
+      <span class="timer" id="timer" title="Spielzeit">0:00</span>
+      <div class="prog" title="Entschiedene Felder"><span id="progBar"></span></div>
+      <span class="progtxt" id="progTxt">0 %</span>
+      <button class="iconbtn" id="undoBtn" title="Rückgängig (Strg+Z)" aria-label="Rückgängig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+      <button class="iconbtn" id="redoBtn" title="Wiederholen (Strg+Y)" aria-label="Wiederholen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+    </div>
+  </header>
+
+  <aside class="side">
+    <section>
+      <h2>Rätsel</h2>
+      <div class="stack">
+        <button id="openBtn" class="primary">Rätsel öffnen…</button>
+        <button id="saveBtn">Stand speichern</button>
+        <div class="row2">
+          <button id="pasteBtn">JSON-Text…</button>
+          <button id="formatBtn">Dateiformat</button>
+        </div>
+        <div class="row2">
+          <button id="randomBtn" title="Erzeugt sofort ein neues Rätsel mit den Einstellungen des Erstellers">Zufallsrätsel</button>
+          <button id="createBtn">Ersteller…</button>
+        </div>
+        <button id="exampleBtn">Beispielrätsel laden</button>
+      </div>
+      <input type="file" id="fileInput" accept=".json,application/json" hidden>
+      <p class="note">Du kannst eine JSON-Datei oder ein Bild auch direkt auf das Spielfeld ziehen.</p>
+    </section>
+
+    <section>
+      <h2>Werkzeug</h2>
+      <div class="tools" role="radiogroup" aria-label="Werkzeug">
+        <label><input type="radio" name="tool" value="1" checked><span class="sw f"></span>Füllen</label>
+        <label><input type="radio" name="tool" value="2"><span class="sw e"></span>Leer</label>
+        <label><input type="radio" name="tool" value="0"><span class="sw r"></span>Radieren</label>
+      </div>
+      <p class="note">Ziehen bemalt mehrere Felder. Rechtsklick oder Umschalt+Klick markiert Felder als leer. Tasten: Pfeile, Leertaste, X, Entf.</p>
+    </section>
+
+    <section>
+      <h2>Hilfe</h2>
+      <div class="stack">
+        <button id="hintBtn">Hinweis <kbd>H</kbd></button>
+        <button id="checkBtn">Prüfen</button>
+        <div class="row2">
+          <button id="solveBtn">Lösung zeigen</button>
+          <button id="resetBtn">Zurücksetzen</button>
+        </div>
+        <label class="check"><input type="checkbox" id="liveErr"> Fehler sofort markieren</label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Ansicht</h2>
+      <div class="stack">
+        <label class="zoom">Zoom <input type="range" id="zoom" min="0.5" max="2.5" step="0.1" value="1" aria-label="Zoom"></label>
+        <label class="check"><input type="checkbox" id="showNums" checked disabled> Zahlen zeigen (nach dem Lösen)</label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Info</h2>
+      <dl class="info">
+        <dt>Größe</dt><dd id="iSize">–</dd>
+        <dt>Zahlen</dt><dd id="iClues">–</dd>
+        <dt>Lösung</dt><dd id="iSolv">–</dd>
+        <dt>Autor</dt><dd id="iAuthor">–</dd>
+      </dl>
+    </section>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="board-frame" id="frame"><canvas id="board" tabindex="0" aria-label="Spielfeld"></canvas></div>
+  </main>
+  <footer class="status" id="status" role="status" aria-live="polite"></footer>
+</div>
+
+<dialog id="jsonDlg">
+  <form method="dialog" class="dlg" id="jsonForm">
+    <h3>Rätsel als JSON-Text</h3>
+    <p>Füge ein Rätsel oder einen gespeicherten Stand ein und lade ihn. Umgekehrt kannst du den aktuellen Stand hier als Text holen und kopieren.</p>
+    <textarea id="jsonText" spellcheck="false" aria-label="JSON-Text"></textarea>
+    <div class="msg" id="jsonMsg"></div>
+    <div class="actions">
+      <button type="button" id="jsonCurrent">Aktuellen Stand einfügen</button>
+      <button type="button" id="jsonCopy">Kopieren</button>
+      <button type="button" id="jsonLoad" class="primary">Laden</button>
+      <button value="cancel">Schließen</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="formatDlg">
+  <form method="dialog" class="dlg">
+    <h3>Dateiformat</h3>
+    <p>Ein Rätsel ist ein JSON-Objekt. Die Zahlen stehen zeilenweise in <code>clues</code>, ein Punkt bedeutet „keine Zahl“.</p>
+<pre id="fmtExample"></pre>
+    <ul>
+      <li><code>clues</code> (Pflicht): Zeichenketten pro Zeile mit <code>0</code>–<code>9</code> und <code>.</code>, oder Arrays mit Zahlen und <code>null</code>.</li>
+      <li><code>width</code>, <code>height</code>, <code>title</code>, <code>author</code>: optional.</li>
+      <li><code>solution</code> (optional): <code>#</code> gefüllt, <code>.</code> leer. Fehlt sie, berechnet die App die Lösung selbst.</li>
+      <li><code>progress</code> wird beim Speichern ergänzt: <code>cells</code> mit <code>#</code> gefüllt, <code>x</code> leer, <code>.</code> offen, dazu die Spielzeit.</li>
+    </ul>
+    <div class="actions">
+      <button type="button" id="fmtSave">Vorlage speichern</button>
+      <button value="cancel" class="primary">Schließen</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="createDlg" class="wide">
+  <form method="dialog" class="dlg" id="createForm">
+    <h3>Rätsel erstellen</h3>
+    <p>Lass ein Motiv erzeugen oder nimm ein eigenes Bild. Felder kannst du in der Vorschau umschalten. Der Generator legt dann so wenige Zahlen fest, dass das Rätsel eindeutig und ohne Raten lösbar bleibt.</p>
+    <div class="create-grid">
+      <div class="create-controls">
+        <div class="tools two" role="radiogroup" aria-label="Quelle">
+          <label><input type="radio" name="cSrc" value="motif" checked>Zufallsmotiv</label>
+          <label><input type="radio" name="cSrc" value="image">Eigenes Bild</label>
+        </div>
+
+        <div class="stack" id="cMotifOpts">
+          <label class="field">Motiv
+            <select id="cKind">
+              <option value="any">Überraschung</option>
+            </select>
+          </label>
+          <button type="button" id="cNewMotif">Neues Motiv</button>
+        </div>
+
+        <div class="stack" id="cImageOpts" hidden>
+          <p class="note">Verwende nur bereinigte Bilder – ohne personenbezogene oder vertrauliche Inhalte.</p>
+          <button type="button" id="cImgBtn" class="primary">Bild wählen…</button>
+          <input type="file" id="cImgInput" accept="image/*" hidden>
+          <span class="note" id="cImgName">Kein Bild gewählt.</span>
+          <label class="check"><input type="checkbox" id="cKeep" checked> Seitenverhältnis beibehalten</label>
+          <div class="field">
+            <span class="field-row"><label for="cThr">Schwelle</label> <output id="cThrVal">128</output></span>
+            <div class="thr-row"><input type="range" id="cThr" min="1" max="254" value="128"><button type="button" id="cAuto">Auto</button></div>
+          </div>
+          <label class="check"><input type="checkbox" id="cInv"> Hell und dunkel tauschen</label>
+          <label class="check"><input type="checkbox" id="cSmooth" checked> Einzelne Pixel glätten</label>
+          <label class="check"><input type="checkbox" id="cUnderlay" checked> Bild in der Vorschau hinterlegen</label>
+        </div>
+
+        <div class="row2">
+          <label class="field">Breite <input type="number" id="cW" min="5" max="80" value="20"></label>
+          <label class="field">Höhe <input type="number" id="cH" min="5" max="80" value="20"></label>
+        </div>
+        <label class="field">Titel <input type="text" id="cTitle" placeholder="Eigenes Motiv" maxlength="80"></label>
+        <label class="field">Schwierigkeit
+          <select id="cLevel">
+            <option value="easy" selected>Normal – nur einfache Schlüsse</option>
+            <option value="moderate">Fortgeschritten – sehr wenige Vergleiche</option>
+            <option value="medium">Knifflig – mit Vergleichen</option>
+          </select>
+        </label>
+      </div>
+      <div class="create-preview" id="cPreviewBox">
+        <canvas id="cPreview" aria-label="Vorschau des Rasters"></canvas>
+        <p class="note" id="cStats"></p>
+        <div class="preview-opts">
+          <button type="button" id="cClearEdits">Handänderungen verwerfen</button>
+        </div>
+        <p class="note">Klicke oder ziehe in der Vorschau, um Felder umzuschalten.</p>
+      </div>
+    </div>
+    <div class="gen-progress" id="cProgress" hidden><span></span></div>
+    <div class="msg" id="cMsg"></div>
+    <div class="actions">
+      <button value="cancel">Schließen</button>
+      <button type="button" id="cJpg" title="Erzeugt das Rätsel und speichert Aufgabe und Lösung als zwei JPG-Dateien. Der Dialog bleibt offen.">Aufgabe + Lösung als JPG</button>
+      <button type="button" id="cCreate" class="primary">Rätsel erstellen und spielen</button>
+    </div>
+  </form>
+</dialog>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
