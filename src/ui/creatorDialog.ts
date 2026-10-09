@@ -59,6 +59,9 @@ export class CreatorDialog {
   private pattern: Uint8Array = new Uint8Array(DEFAULT_SIZE * DEFAULT_SIZE);
   /** Manuelle Änderungen in der Vorschau: Index → 0/1. */
   private edits = new Map<number, number>();
+  /** Bild-Modus: automatisch erzeugte Felder entfernt – nur das Bild dient als Vorlage. */
+  private blank = false;
+  private blankBtn = byId<HTMLButtonElement>('cBlank');
   private cellPx = 16;
   private paintValue: number | null = null;
   private busy = false;
@@ -82,13 +85,16 @@ export class CreatorDialog {
     this.widthIn.addEventListener('change', () => this.onSizeChange('width'));
     this.heightIn.addEventListener('change', () => this.onSizeChange('height'));
     this.keepIn.addEventListener('change', () => this.onSizeChange('width'));
-    this.thrIn.addEventListener('input', () => this.rebuild());
-    this.invIn.addEventListener('change', () => this.rebuild());
-    this.smoothIn.addEventListener('change', () => this.rebuild());
+    // Wer an Schwelle, Umkehrung oder Glättung dreht, möchte die automatischen Felder wieder sehen
+    this.thrIn.addEventListener('input', () => { this.setBlank(false); this.rebuild(); });
+    this.invIn.addEventListener('change', () => { this.setBlank(false); this.rebuild(); });
+    this.smoothIn.addEventListener('change', () => { this.setBlank(false); this.rebuild(); });
+    this.blankBtn.addEventListener('click', () => this.toggleBlank());
     this.underlayIn.addEventListener('change', () => this.draw());
     byId('cAuto').addEventListener('click', () => {
       if (!this.lum) return;
       this.thrIn.value = String(otsuThreshold(this.lum));
+      this.setBlank(false);
       this.rebuild();
     });
     byId('cClearEdits').addEventListener('click', () => {
@@ -145,6 +151,8 @@ export class CreatorDialog {
     if (radio) radio.checked = true;
     this.motifOpts.hidden = source !== 'motif';
     this.imageOpts.hidden = source !== 'image';
+    this.blankBtn.hidden = source !== 'image';
+    this.updateBlankButton();
     this.edits.clear();
     if (source === 'image') {
       if (this.img) this.onSizeChange('width', false, true);
@@ -183,6 +191,7 @@ export class CreatorDialog {
       this.img = img;
       this.imgName.textContent = `${file.name} (${img.width} × ${img.height} px)`;
       this.edits.clear();
+      this.setBlank(false);
       this.keepIn.checked = true;
       this.onSizeChange('width', false, true);
       if (this.lum) this.thrIn.value = String(otsuThreshold(this.lum));
@@ -231,7 +240,7 @@ export class CreatorDialog {
       const motif = generateMotif(this.kindIn.value as MotifKind | 'any', this.cols, this.rows, this.motifSeed);
       this.motifKind = motif.kind;
       p = Uint8Array.from(motif.pattern);
-    } else if (this.lum) {
+    } else if (this.lum && !this.blank) {
       p = toPattern(this.lum, Number(this.thrIn.value), this.invIn.checked);
       if (this.smoothIn.checked) p = smoothPattern(p, this.cols, this.rows);
     } else {
@@ -246,7 +255,41 @@ export class CreatorDialog {
   private updateStats(): void {
     const pct = Math.round(fillRatio(this.pattern) * 100);
     const edits = this.edits.size ? `, ${this.edits.size} von Hand geändert` : '';
-    this.stats.textContent = `${this.cols} × ${this.rows} Felder, ${pct} % gefüllt${edits}`;
+    const blank = this.source === 'image' && this.blank ? ', automatische Felder entfernt' : '';
+    this.stats.textContent = `${this.cols} × ${this.rows} Felder, ${pct} % gefüllt${edits}${blank}`;
+  }
+
+  /* ---------- Leeres Raster mit Bild als Vorlage ---------- */
+
+  private setBlank(blank: boolean): void {
+    this.blank = blank;
+    this.updateBlankButton();
+  }
+
+  private updateBlankButton(): void {
+    this.blankBtn.disabled = this.busy || !this.img;
+    this.blankBtn.textContent = this.blank ? 'Automatische Felder wiederherstellen' : 'Automatische Felder entfernen';
+    this.blankBtn.setAttribute('aria-pressed', String(this.blank));
+  }
+
+  /**
+   * Entfernt die automatisch erzeugten Felder (Bild bleibt als Vorlage sichtbar) bzw. stellt
+   * sie wieder her. Handänderungen bleiben in beiden Richtungen erhalten.
+   */
+  private toggleBlank(): void {
+    if (!this.img) return;
+    if (this.blank) {
+      this.setBlank(false);
+      this.rebuild();
+      this.say('Die automatisch erzeugten Felder sind wieder da. Deine Handänderungen bleiben erhalten.');
+      return;
+    }
+    this.setBlank(true);
+    this.underlayIn.checked = true;
+    this.rebuild();
+    this.say(this.edits.size
+      ? 'Die automatischen Felder sind entfernt, deine Handänderungen bleiben erhalten. Das Bild dient als Vorlage.'
+      : 'Das Raster ist leer, das Bild dient als Vorlage. Klicke oder ziehe in der Vorschau, um Felder zu füllen.');
   }
 
   private say(text: string, error = false): void {
@@ -346,6 +389,7 @@ export class CreatorDialog {
     this.form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>('input, select, button')
       .forEach(el => { if (el.value !== 'cancel') el.disabled = busy; });
     this.progress.hidden = !busy;
+    this.updateBlankButton();
     this.createBtn.textContent = busy ? 'Wird erstellt…' : 'Rätsel erstellen und spielen';
   }
 

@@ -27,81 +27,222 @@ Die App besteht nach dem Build nur aus wenigen statischen Dateien (rund 100 KB).
 
 ### Was du brauchst
 
-- ein Google-Konto
-- **Node.js 20 oder neuer** (https://nodejs.org – die „LTS“-Version wählen)
-- dieses Projekt, entpackt in einen Ordner, z. B. `mosaik`
+- ein **Google-Konto** (z. B. eine Gmail-Adresse)
+- einen Computer mit Windows, macOS oder Linux und Internetzugang
+- **Node.js 20 oder neuer** – wie du es installierst, steht in Schritt 1
+- dieses Projekt als ZIP-Datei (`mosaik-typescript.zip`)
+- etwa 20 Minuten Zeit für die erste Einrichtung; spätere Updates dauern nur noch eine Minute
 
-Ob Node.js installiert ist, prüfst du im Terminal mit `node -v`. Die Ausgabe muss mit `v20` oder höher beginnen.
+> **Hinweis zu den Bildschirmtexten:** Die Firebase-Konsole ist je nach Spracheinstellung deutsch oder englisch. Die Bezeichnungen sind hier auf Deutsch angegeben, die englischen stehen in Klammern. Google passt die Oberfläche gelegentlich an, einzelne Texte können daher leicht abweichen.
 
-### Schritt 1: Terminal im Projektordner öffnen
+### Kurzer Überblick: Was ist ein Terminal?
 
-- **Windows:** Im Explorer den Ordner `mosaik` öffnen, in die Adresszeile `cmd` tippen und Enter drücken.
-- **macOS:** Programm „Terminal“ öffnen, `cd ` eingeben (mit Leerzeichen), den Ordner `mosaik` ins Fenster ziehen und Enter drücken.
-- **Linux:** Im Dateimanager per Rechtsklick „Im Terminal öffnen“.
+Einige Schritte werden im **Terminal** erledigt – einem Fenster, in das man Befehle eintippt. Dabei gilt:
 
-Alle folgenden Befehle werden in diesem Terminal ausgeführt.
+- Befehle stehen in dieser Anleitung in grauen Kästen, z. B. `npm install`. Du kannst sie kopieren und ins Terminal einfügen (Windows: Strg+V oder Rechtsklick, macOS: Cmd+V).
+- Jeder Befehl wird mit **Enter** ausgeführt.
+- Während ein Befehl läuft, erscheinen Textzeilen. Er ist fertig, wenn wieder die Eingabezeile mit blinkendem Cursor erscheint.
+- Gelbe Warnungen wie `npm warn deprecated …` sind normal und können ignoriert werden. Nur Zeilen mit **`Error`** bzw. **`Fehler`** deuten auf ein Problem hin – siehe [Fehlerbehebung](#fehlerbehebung).
+- Ein laufender Befehl lässt sich mit **Strg+C** abbrechen.
 
-### Schritt 2: Projekt vorbereiten
+---
+
+### Schritt 1: Node.js installieren
+
+Node.js wird gebraucht, um die App zu bauen und hochzuladen. Für die Nutzer der fertigen App ist es nicht nötig.
+
+1. https://nodejs.org öffnen.
+2. Die Version mit der Aufschrift **LTS** herunterladen (empfohlen, „Long Term Support“).
+3. Das heruntergeladene Installationsprogramm starten und mit den vorgeschlagenen Einstellungen durchklicken.
+   - **Windows:** Die Option „Tools for Native Modules“ (bzw. „Automatically install the necessary tools“) wird **nicht** benötigt und kann abgewählt bleiben.
+   - **macOS:** Eventuell fragt der Mac nach dem Passwort des Benutzerkontos – das ist normal.
+   - **Linux:** Am einfachsten über die Paketverwaltung oder den auf nodejs.org beschriebenen Weg; Node.js muss mindestens Version 20 haben.
+4. Prüfen, ob es geklappt hat: Ein **neues** Terminal öffnen (siehe Schritt 2) und eingeben:
+
+   ```bash
+   node -v
+   npm -v
+   ```
+
+   Die erste Ausgabe muss mit `v20` oder höher beginnen, z. B. `v22.11.0`. Die zweite zeigt eine Versionsnummer wie `10.9.0`. Erscheint stattdessen „Befehl nicht gefunden“ bzw. „ist nicht als interner oder externer Befehl … erkannt“, das Terminal schließen und neu öffnen; hilft das nicht, den Computer neu starten.
+
+Ist Node.js bereits installiert, aber älter als Version 20, einfach die aktuelle LTS-Version darüber installieren.
+
+### Schritt 2: Projekt entpacken und Terminal im Projektordner öffnen
+
+**Entpacken**
+
+- **Windows:** Rechtsklick auf `mosaik-typescript.zip` → **Alle extrahieren…** → Zielordner wählen (z. B. `Dokumente`) → **Extrahieren**.
+- **macOS:** Doppelklick auf die ZIP-Datei.
+- **Linux:** Rechtsklick → **Hier entpacken**.
+
+Es entsteht ein Ordner `mosaik`, darin liegen u. a. die Dateien `package.json` und `README.md`.
+
+**Terminal im Ordner `mosaik` öffnen**
+
+- **Windows:**
+  1. Im Explorer den Ordner `mosaik` öffnen (sodass `package.json` sichtbar ist).
+  2. Oben in die **Adresszeile** klicken, den Text durch `cmd` ersetzen und Enter drücken.
+  3. Es öffnet sich ein schwarzes Fenster; die Zeile endet mit `…\mosaik>`.
+
+  Bitte die **Eingabeaufforderung** (`cmd`) verwenden, nicht die PowerShell – dort sind npm-Befehle auf manchen Computern gesperrt.
+- **macOS:**
+  1. Programm **Terminal** öffnen (Spotlight: Cmd+Leertaste, „Terminal“ tippen).
+  2. `cd ` eintippen (mit Leerzeichen dahinter), den Ordner `mosaik` aus dem Finder ins Terminalfenster ziehen und Enter drücken.
+  3. Die Zeile endet nun mit `mosaik %`.
+- **Linux:** Im Dateimanager im Ordner `mosaik` Rechtsklick → **Im Terminal öffnen**.
+
+Zur Kontrolle `dir` (Windows) bzw. `ls` (macOS/Linux) eingeben: In der Liste muss `package.json` auftauchen. Alle weiteren Befehle werden in **diesem** Terminalfenster ausgeführt. Wenn du das Fenster später schließt, für die nächsten Schritte wieder so öffnen.
+
+### Schritt 3: Projekt vorbereiten
+
+Im Terminal eingeben:
 
 ```bash
 npm install
 ```
 
-Das lädt alle benötigten Werkzeuge herunter, auch die Firebase-Befehle (dauert beim ersten Mal ein bis zwei Minuten). Optional prüfst du danach, ob alles funktioniert:
+Das lädt alle benötigten Werkzeuge in den Unterordner `node_modules` – auch die Firebase-Befehle. Beim ersten Mal dauert das ein bis drei Minuten und benötigt rund 350 MB Speicherplatz. Am Ende erscheint eine Zeile wie `added 700 packages in 1m`.
+
+Optional prüfen, ob alles funktioniert:
 
 ```bash
 npm test
 ```
 
-### Schritt 3: Firebase-Projekt anlegen
+Am Ende sollte `Tests  52 passed` (bzw. eine ähnliche Zahl) stehen. Und wer die App vor dem Veröffentlichen lokal ansehen möchte:
 
-1. https://console.firebase.google.com öffnen und mit dem Google-Konto anmelden.
-2. **Projekt erstellen** (bzw. „Projekt hinzufügen“) wählen.
-3. Einen Namen eingeben, z. B. `Mosaik Rätsel`. Darunter zeigt Firebase die **Projekt-ID** (z. B. `mosaik-raetsel`) – sie wird Teil der späteren Adresse. Über das Stift-Symbol lässt sie sich jetzt noch ändern, später nicht mehr.
-4. Google Analytics wird nicht benötigt und kann ausgeschaltet werden.
-5. Nach dem Anlegen im linken Menü unter **Build → Hosting** auf **Jetzt starten** klicken und die angezeigten Schritte mit **Weiter** überspringen – die Befehle dort sind bereits im Projekt eingebaut. Dadurch wird die Website im Projekt angelegt.
+```bash
+npm run dev
+```
 
-Das Projekt startet automatisch im kostenlosen **Spark-Tarif**; eine Zahlungsmethode ist nicht nötig.
+Dann im Browser die angezeigte Adresse öffnen (meist `http://localhost:5173`). Mit **Strg+C** im Terminal wird der lokale Server wieder beendet.
 
-### Schritt 4: Im Terminal bei Google anmelden
+### Schritt 4: Firebase-Projekt anlegen
+
+Ein Firebase-Projekt ist der „Behälter“ für die veröffentlichte App. Es wird einmal im Browser angelegt.
+
+1. https://console.firebase.google.com öffnen und mit dem Google-Konto anmelden. Beim allerersten Besuch müssen die Nutzungsbedingungen bestätigt werden.
+2. Auf **Neues Firebase-Projekt erstellen** (*Create a new Firebase project*) bzw. **Projekt hinzufügen** (*Add project*) klicken.
+3. **Projektname** eingeben, z. B. `Mosaik Rätsel`.
+   - Darunter erscheint die **Projekt-ID**, z. B. `mosaik-raetsel` oder mit angehängter Zufallsendung wie `mosaik-raetsel-3f2a1`. Sie wird Teil der Internetadresse: `https://mosaik-raetsel.web.app`.
+   - Über das Stift-Symbol neben der ID lässt sie sich jetzt noch ändern (nur Kleinbuchstaben, Ziffern und Bindestriche, weltweit eindeutig). **Später ist das nicht mehr möglich.**
+   - Die Bedingungen bestätigen und auf **Weiter** (*Continue*) klicken.
+4. **Gemini in Firebase** (KI-Assistent in der Konsole): wird für die App nicht benötigt – den Schalter ausschalten und **Weiter**.
+5. **Google Analytics**: wird nicht benötigt – den Schalter **Google Analytics für dieses Projekt aktivieren** ausschalten. Danach heißt der Button **Projekt erstellen** (*Create project*).
+6. Kurz warten, bis „Ihr neues Projekt ist bereit“ (*Your Firebase project is ready*) erscheint, dann **Weiter**. Es öffnet sich die Projektübersicht.
+7. **Hosting aktivieren:**
+   1. Im linken Menü **Build** (bzw. **Erstellen**) aufklappen und **Hosting** wählen. Falls der Punkt nicht sichtbar ist: über **Alle Produkte** (*All products*) nach „Hosting“ suchen.
+   2. Auf **Jetzt starten** (*Get started*) klicken.
+   3. Der Assistent zeigt drei Schritte („Firebase CLI installieren“, „Projekt initialisieren“, „Bereitstellen“). Diese Befehle sind im Projekt bereits eingebaut – einfach jeweils **Weiter** (*Next*) und zuletzt **Weiter zur Konsole** (*Continue to console*) klicken.
+
+   Damit legt Firebase die Website im Projekt an. Ohne diesen Schritt meldet das Hochladen später „Could not determine the default site for the project“.
+
+Das Projekt läuft automatisch im kostenlosen **Spark-Tarif**. Es wird **keine** Zahlungsmethode verlangt; falls doch ein Dialog zum „Upgrade“ oder zum Blaze-Tarif erscheint, diesen schließen – er ist für die App nicht nötig.
+
+### Schritt 5: Im Terminal bei Google anmelden
+
+Damit das Terminal Dateien in dein Firebase-Projekt hochladen darf, meldest du dich einmalig an:
 
 ```bash
 npm run firebase:login
 ```
 
-Es öffnet sich ein Browserfenster: dasselbe Google-Konto wählen und den Zugriff erlauben. Die Frage, ob Firebase anonyme Nutzungsdaten sammeln darf, kannst du nach Belieben beantworten. Am Ende meldet das Terminal `Success! Logged in as …`.
+Nacheinander erscheinen zwei Fragen, die jeweils mit `Y` (ja) oder `n` (nein) und Enter beantwortet werden:
 
-Die Anmeldung bleibt auf diesem Computer gespeichert; dieser Schritt ist nur einmal nötig.
+1. `Enable Gemini in Firebase features?` – betrifft nur KI-Funktionen des Firebase-Werkzeugs, die hier nicht gebraucht werden. Empfehlung: **`n`**.
+2. `Allow Firebase to collect CLI and Emulator Suite usage and error reporting information?` – anonyme Nutzungsstatistik für Google. Nach Belieben; im Zweifel **`n`**.
 
-### Schritt 5: Projekt verknüpfen
+Danach öffnet sich automatisch ein Browserfenster:
+
+1. Das **gleiche Google-Konto** wählen, mit dem in Schritt 4 das Projekt angelegt wurde.
+2. Die Seite „Firebase CLI möchte auf Ihr Google-Konto zugreifen“ mit **Zulassen** (*Allow*) bestätigen.
+3. Es erscheint „Firebase CLI Login Successful“. Das Browserfenster kann geschlossen werden.
+
+Im Terminal steht nun:
+
+```
+✔  Success! Logged in as name@gmail.com
+```
+
+Die Anmeldung bleibt auf diesem Computer gespeichert; dieser Schritt ist nur einmal nötig. Öffnet sich kein Browser (z. B. im Firmennetz oder auf einem entfernten Rechner), siehe [Fehlerbehebung](#fehlerbehebung).
+
+### Schritt 6: Projekt verknüpfen
+
+Jetzt sagst du dem Projektordner, in welches Firebase-Projekt er hochladen soll:
 
 ```bash
 npm run firebase:setup
 ```
 
-1. Mit den Pfeiltasten das in Schritt 3 angelegte Projekt auswählen und Enter drücken.
-2. Bei der Frage nach einem Alias `default` eingeben und Enter drücken.
+1. Es erscheint eine Liste deiner Firebase-Projekte:
 
-Dadurch entsteht im Projektordner die Datei `.firebaserc`, die sich das Projekt merkt.
+   ```
+   ? Which project do you want to add? (Use arrow keys)
+   ❯ mosaik-raetsel (Mosaik Rätsel)
+   ```
 
-### Schritt 6: Veröffentlichen
+   Mit den **Pfeiltasten** das Projekt aus Schritt 4 auswählen und **Enter** drücken.
+2. Dann:
+
+   ```
+   ? What alias do you want to use for this project? (e.g. staging)
+   ```
+
+   **`default`** eintippen (genau so, kleingeschrieben) und **Enter** drücken.
+3. Zur Bestätigung erscheint:
+
+   ```
+   Created alias default for mosaik-raetsel.
+   Now using alias default (mosaik-raetsel)
+   ```
+
+Im Projektordner liegt nun die Datei `.firebaserc`, die sich das Projekt merkt. (Dateien mit Punkt am Anfang sind im Explorer/Finder oft ausgeblendet – das ist normal.)
+
+### Schritt 7: Veröffentlichen
 
 ```bash
 npm run deploy
 ```
 
-Der Befehl prüft die Einrichtung, baut die App und lädt sie hoch. Am Ende steht im Terminal:
+Der Befehl erledigt drei Dinge nacheinander: Er prüft die Einrichtung, baut die App (Ordner `dist`) und lädt sie hoch. Das dauert etwa eine halbe Minute. Die Ausgabe sieht sinngemäß so aus:
 
 ```
+Firebase-Projekt: mosaik-raetsel
+…
+✓ built in 1.2s
+
+=== Deploying to 'mosaik-raetsel'...
+
+i  deploying hosting
+i  hosting[mosaik-raetsel]: beginning deploy...
+i  hosting[mosaik-raetsel]: found 7 files in dist
+✔  hosting[mosaik-raetsel]: file upload complete
+✔  hosting[mosaik-raetsel]: version finalized
+✔  hosting[mosaik-raetsel]: release complete
+
 ✔  Deploy complete!
+
+Project Console: https://console.firebase.google.com/project/mosaik-raetsel/overview
 Hosting URL: https://mosaik-raetsel.web.app
 ```
 
-Diese Adresse im Browser öffnen – fertig. Die App ist zusätzlich unter `https://<projekt-id>.firebaseapp.com` erreichbar.
+Die Adresse hinter **Hosting URL** ist die Adresse deiner App. Sie ist zusätzlich unter `https://<projekt-id>.firebaseapp.com` erreichbar.
+
+### Schritt 8: Prüfen und teilen
+
+1. Die Hosting-URL im Browser öffnen. Es erscheint das Beispielrätsel „Segelboot“.
+2. Kurz testen:
+   - **Zufallsrätsel** anklicken – nach einem Moment erscheint ein neues Rätsel.
+   - **Ersteller…** → **Aufgabe + Lösung als JPG** – zwei Bilder werden heruntergeladen (manche Browser fragen beim ersten Mal, ob mehrere Downloads erlaubt sind).
+3. Die Adresse auch auf dem Handy öffnen; die App passt sich der Bildschirmgröße an.
+4. Zum Teilen genügt die Adresse. Tipp: Im Browser lässt sich die App als Lesezeichen speichern oder auf dem Handy über **Zum Startbildschirm hinzufügen** wie eine App ablegen.
+
+Jeder Nutzer hat seinen eigenen Spielstand – er wird im jeweiligen Browser gespeichert und ist für niemanden sonst sichtbar.
 
 ### Updates veröffentlichen
 
-Nach jeder Änderung am Projekt genügt:
+Nach jeder Änderung am Projekt das Terminal im Ordner `mosaik` öffnen (wie in Schritt 2) und eingeben:
 
 ```bash
 npm run deploy
@@ -127,7 +268,7 @@ In der Firebase-Konsole unter **Hosting → Benutzerdefinierte Domain hinzufüge
 npx firebase hosting:disable
 ```
 
-Danach ist die Adresse nicht mehr erreichbar. Mit `npm run deploy` lässt sich die App jederzeit wieder veröffentlichen. Um alles endgültig zu entfernen, das Projekt in der Firebase-Konsole unter **Projekteinstellungen** löschen.
+Die Sicherheitsabfrage mit `y` und Enter bestätigen. Danach ist die Adresse nicht mehr erreichbar. Mit `npm run deploy` lässt sich die App jederzeit wieder veröffentlichen. Um alles endgültig zu entfernen, das Projekt in der Firebase-Konsole unter **Projekteinstellungen** löschen.
 
 ### Kosten und Grenzen
 
@@ -143,16 +284,19 @@ Firebase Hosting ist im Spark-Tarif kostenlos und enthält 10 GB Speicher sowie 
 
 | Meldung / Problem | Lösung |
 |---|---|
-| „Es ist noch kein Firebase-Projekt verknüpft“ | Schritt 5 ausführen: `npm run firebase:setup` |
-| `Failed to authenticate, have you run firebase login?` | Schritt 4 ausführen: `npm run firebase:login` |
-| `'firebase' ist nicht als interner oder externer Befehl …` bzw. `firebase: command not found` | `npm install` im Projektordner ausführen (Schritt 2) |
+| „Es ist noch kein Firebase-Projekt verknüpft“ | Schritt 6 ausführen: `npm run firebase:setup` |
+| `Failed to authenticate, have you run firebase login?` | Schritt 5 ausführen: `npm run firebase:login` |
+| `'firebase' ist nicht als interner oder externer Befehl …` bzw. `firebase: command not found` | `npm install` im Projektordner ausführen (Schritt 3) |
 | Hinweis auf eine zu alte Node.js-Version (`requires node >=20`) | Aktuelle LTS-Version von https://nodejs.org installieren, Terminal neu öffnen |
-| Windows PowerShell: „Die Ausführung von Skripts ist auf diesem System deaktiviert“ | Statt PowerShell die Eingabeaufforderung `cmd` verwenden (siehe Schritt 1) |
-| Beim Anmelden öffnet sich kein Browser oder die Anmeldung hängt (z. B. Firmennetz, entfernter Rechner) | `npx firebase login --no-localhost` und den angezeigten Anweisungen folgen |
+| Windows PowerShell: „Die Ausführung von Skripts ist auf diesem System deaktiviert“ | Statt PowerShell die Eingabeaufforderung `cmd` verwenden (siehe Schritt 2) |
+| Beim Anmelden öffnet sich kein Browser oder die Anmeldung hängt (z. B. Firmennetz, entfernter Rechner) | Mit Strg+C abbrechen, dann `npx firebase login --no-localhost` ausführen: Den angezeigten Link im Browser öffnen, anmelden, den angezeigten Code kopieren und ins Terminal einfügen |
 | `HTTP Error: 403` oder „permission denied“ | Falsches Google-Konto: `npx firebase logout`, dann `npm run firebase:login` mit dem Konto, das das Projekt angelegt hat |
-| „Hosting site not found“ oder `404` beim Deploy | In der Konsole unter **Build → Hosting** auf **Jetzt starten** klicken (Schritt 3, Punkt 5) |
+| `Could not determine the default site for the project.`, „Hosting site not found“ oder `404` beim Deploy | In der Konsole unter **Build → Hosting** auf **Jetzt starten** klicken (Schritt 4, Punkt 7) |
 | Im Browser erscheint noch die alte Version | Seite neu laden (Strg+F5 bzw. Cmd+Shift+R) |
 | Falsches Projekt verknüpft | `npm run firebase:setup` erneut ausführen oder die Datei `.firebaserc` löschen und neu verknüpfen |
+| In der Projektliste bei Schritt 6 fehlt das Projekt | Mit einem anderen Google-Konto angemeldet: `npx firebase logout`, dann Schritt 5 wiederholen |
+| `npm install` bricht mit Netzwerkfehler ab (`ETIMEDOUT`, `ECONNRESET`) | Internetverbindung prüfen und erneut ausführen; im Firmennetz ggf. Proxy-Einstellungen bei der IT erfragen |
+| Ich habe mich bei den Fragen in Schritt 5 vertippt | `npx firebase logout` und Schritt 5 wiederholen – die Fragen werden erneut gestellt |
 
 ### Alternative ohne Google-Konto
 
@@ -258,7 +402,8 @@ Kleine Rätsel werden etwa 2000 px groß gezeichnet und eignen sich für den Dru
 2. Rastergröße einstellen (5–80 Felder je Seite). Die Höhe folgt auf Wunsch dem Seitenverhältnis.
 3. Die **Schwelle** bestimmt, ab welcher Helligkeit ein Feld gefüllt wird. „Auto“ wählt sie automatisch (Otsu-Verfahren). „Hell und dunkel tauschen“ kehrt das Bild um, „Einzelne Pixel glätten“ entfernt Ausreißer.
 4. In der Vorschau lassen sich Felder per Klick oder Ziehen umschalten. Ohne Bild kann man dort auch frei zeichnen.
-5. **Schwierigkeit** wählen und „Rätsel erstellen“.
+5. Wer das Motiv lieber selbst nachzeichnen möchte: **Automatische Felder entfernen** entfernt die aus dem Bild erzeugten Felder, das Bild bleibt als Vorlage hinterlegt. Von Hand gesetzte Felder bleiben dabei erhalten. Dann die gewünschten Felder per Klick oder Ziehen füllen. Derselbe Button heißt danach **Automatische Felder wiederherstellen** und holt die erzeugten Felder zurück (selbst gezeichnete Felder bleiben dabei erhalten). Auch eine Änderung an Schwelle, Umkehrung oder Glättung stellt die automatischen Felder wieder her.
+6. **Schwierigkeit** wählen und „Rätsel erstellen und spielen“ bzw. „Aufgabe + Lösung als JPG“.
 
 Der Generator startet mit allen Zahlen und entfernt sie in zufälliger Reihenfolge, solange das Rätsel ohne Raten eindeutig lösbar bleibt:
 
