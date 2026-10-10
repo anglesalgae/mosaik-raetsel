@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { exportFileNames, exportLayout } from '../src/io/imageExport';
+import { EXPORT_CELL, exportFileNames, exportLayout } from '../src/io/imageExport';
 
 describe('Bild-Export', () => {
-  it('wählt lesbare Feldgrößen', () => {
-    expect(exportLayout(15, 15).cell).toBe(120);
-    expect(exportLayout(80, 80).cell).toBe(22);
-    expect(exportLayout(200, 10).cell).toBe(18);
+  it('verwendet für alle Rastergrößen dieselbe Feldgröße', () => {
+    expect(exportLayout(15, 15).cell).toBe(EXPORT_CELL);
+    expect(exportLayout(80, 80).cell).toBe(EXPORT_CELL);
+    expect(exportLayout(200, 10).cell).toBe(EXPORT_CELL);
+  });
+
+  it('lässt das Raster proportional zu Zeilen und Spalten wachsen', () => {
+    const small = exportLayout(20, 10), big = exportLayout(40, 30);
+    expect(big.gridWidth - small.gridWidth).toBe(20 * EXPORT_CELL);
+    expect(big.height - small.height).toBe(20 * EXPORT_CELL);
   });
 
   it('lässt Platz für Rand und Titel', () => {

@@ -13,13 +13,18 @@ const COLORS = {
   background: '#FFFFFF',
   ink: '#1B2540',
   muted: '#5B677E',
-  line: '#B9C2CE',
+  line: '#7F8A9C',
   lineStrong: '#1B2540',
   filled: '#1B2540',
   onFilled: '#FFFFFF'
 };
 
+/** Seitenfaktor der Bildausgabe: halbe Breite und Höhe = ein Viertel der Pixel. */
+const EXPORT_SCALE = 0.5;
+
 const FONT = '"Atkinson Hyperlegible", "Segoe UI", Arial, sans-serif';
+/** Schrift für die Zahlen im Raster – klare Ziffern, auch bei kleiner Auflösung gut lesbar. */
+const CLUE_FONT = 'Arial, "Helvetica Neue", Helvetica, sans-serif';
 
 export interface ExportLayout {
   cell: number;
@@ -34,11 +39,17 @@ export interface ExportLayout {
   height: number;
 }
 
-/** Größen so wählen, dass das Raster etwa 1800 px groß wird (druckfähig auf A4) und Zahlen lesbar bleiben. */
+/** Feste Kästchengröße im Layout-Maßstab – ausgegeben wird sie mit EXPORT_SCALE (also 30 px). */
+export const EXPORT_CELL = 60;
+
+/**
+ * Feste Kästchengröße für alle Rastergrößen: Die Bildgröße wächst mit der Zahl der Zeilen und Spalten,
+ * sodass alle Bilder mit demselben Maßstab vergrößert oder verkleinert werden können.
+ */
 export function exportLayout(cols: number, rows: number): ExportLayout {
-  const cell = Math.max(18, Math.min(120, Math.floor(1800 / Math.max(cols, rows))));
-  const margin = Math.max(40, Math.min(120, Math.round(cell * 1.1)));
-  const titleSize = Math.max(28, Math.min(84, Math.round(cell * 0.8)));
+  const cell = EXPORT_CELL;
+  const margin = Math.round(cell * 1.1);
+  const titleSize = Math.round(cell * 0.8);
   const infoSize = Math.round(titleSize * 0.75);
   const header = Math.round(titleSize * 1.3 + margin * 0.5);
   const gridWidth = cols * cell, gridHeight = rows * cell;
@@ -92,10 +103,12 @@ export function renderPuzzleImage(puzzle: Puzzle, solution: Uint8Array | null, k
   const { width: cols, height: rows, clues } = puzzle;
   const L = exportLayout(cols, rows);
   const canvas = document.createElement('canvas');
-  canvas.width = L.width;
-  canvas.height = L.height;
+  canvas.width = Math.round(L.width * EXPORT_SCALE);
+  canvas.height = Math.round(L.height * EXPORT_SCALE);
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D wird nicht unterstützt.');
+  // Gezeichnet wird weiter im Layout-Maßstab, ausgegeben in verringerter Auflösung
+  ctx.scale(canvas.width / L.width, canvas.height / L.height);
 
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, L.width, L.height);
@@ -134,7 +147,7 @@ export function renderPuzzleImage(puzzle: Puzzle, solution: Uint8Array | null, k
   }
 
   // Gitter: dünne Linien, jede fünfte kräftig, dicker Rahmen
-  const thin = Math.max(1, Math.round(cs / 28));
+  const thin = Math.max(2, Math.round(cs / 20));
   const thick = Math.max(2, Math.round(cs / 12));
   ctx.fillStyle = COLORS.line;
   for (let x = 1; x < cols; x++) if (x % 5) ctx.fillRect(ox + x * cs - thin / 2, oy, thin, L.gridHeight);
@@ -149,7 +162,7 @@ export function renderPuzzleImage(puzzle: Puzzle, solution: Uint8Array | null, k
   ctx.fillRect(ox + L.gridWidth, oy, border, L.gridHeight);
 
   // Zahlen
-  ctx.font = `700 ${Math.round(cs * 0.6)}px ${FONT}`;
+  ctx.font = `700 ${Math.round(cs * 0.72)}px ${CLUE_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (let i = 0; i < clues.length; i++) {
