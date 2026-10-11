@@ -48,14 +48,15 @@ export const EXPORT_CELL = 60;
  */
 export function exportLayout(cols: number, rows: number): ExportLayout {
   const cell = EXPORT_CELL;
-  const margin = Math.round(cell * 1.1);
+  // Nur ein schmaler weißer Rand rings um Titel und Raster (etwas breiter als der Rasterrahmen)
+  const margin = Math.round(cell * 0.2);
   const titleSize = Math.round(cell * 0.8);
   const infoSize = Math.round(titleSize * 0.75);
-  const header = Math.round(titleSize * 1.3 + margin * 0.5);
+  const header = Math.round(titleSize * 1.5);
   const gridWidth = cols * cell, gridHeight = rows * cell;
   return {
     cell, margin, titleSize, infoSize, header, gridWidth, gridHeight,
-    width: Math.max(gridWidth + 2 * margin, 640),
+    width: gridWidth + 2 * margin,
     height: gridHeight + header + 2 * margin
   };
 }
@@ -132,7 +133,7 @@ export function renderPuzzleImage(puzzle: Puzzle, solution: Uint8Array | null, k
   ctx.textAlign = 'left';
   ctx.fillStyle = COLORS.ink;
   ctx.font = `700 ${L.titleSize}px ${FONT}`;
-  ctx.fillText(fitText(ctx, puzzle.title, right - L.margin - infoWidth - L.infoSize * 1.5), L.margin, baseline);
+  ctx.fillText(fitText(ctx, puzzle.title, right - L.margin - infoWidth - L.infoSize * 0.8), L.margin, baseline);
 
   const ox = Math.round((L.width - L.gridWidth) / 2);
   const oy = L.margin + L.header;
