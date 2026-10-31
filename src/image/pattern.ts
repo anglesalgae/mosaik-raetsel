@@ -56,10 +56,15 @@ export function smoothPattern(pattern: Uint8Array, w: number, h: number): Uint8A
   return out;
 }
 
-/** Höhe passend zum Seitenverhältnis des Bildes (begrenzt auf min…max). */
-export function heightForAspect(width: number, imgW: number, imgH: number, min: number, max: number): number {
-  if (!imgW || !imgH) return width;
-  return Math.max(min, Math.min(max, Math.round(width * imgH / imgW)));
+/**
+ * Lage des Bildes in einer Fläche w × h: unverzerrt, so groß wie möglich und mittig.
+ * Bei abweichendem Seitenverhältnis bleibt links/rechts bzw. oben/unten ein weißer Streifen.
+ */
+export function containRect(imgW: number, imgH: number, w: number, h: number): { x: number; y: number; w: number; h: number } {
+  if (!imgW || !imgH) return { x: 0, y: 0, w, h };
+  const s = Math.min(w / imgW, h / imgH);
+  const dw = imgW * s, dh = imgH * s;
+  return { x: (w - dw) / 2, y: (h - dh) / 2, w: dw, h: dh };
 }
 
 /** Anteil gefüllter Felder (0…1). */

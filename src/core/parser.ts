@@ -106,7 +106,7 @@ export function parsePuzzleObject(input: unknown): ParsedFile {
   }
 
   const extra: Record<string, unknown> = {};
-  for (const k of ['source', 'description', 'difficulty', 'license']) if (obj[k] !== undefined) extra[k] = obj[k];
+  for (const k of ['source', 'description', 'difficulty', 'clueCount', 'comparisons', 'license']) if (obj[k] !== undefined) extra[k] = obj[k];
 
   return {
     puzzle: {

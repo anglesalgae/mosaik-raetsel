@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fillRatio, heightForAspect, otsuThreshold, smoothPattern, toPattern } from '../src/image/pattern';
+import { containRect, fillRatio, otsuThreshold, smoothPattern, toPattern } from '../src/image/pattern';
 
 describe('Bildraster', () => {
   it('findet eine Schwelle zwischen zwei Helligkeitsgruppen', () => {
@@ -21,8 +21,9 @@ describe('Bildraster', () => {
     expect(Array.from(smoothPattern(hole, 3, 3))).toEqual(Array(9).fill(1));
   });
 
-  it('berechnet die Höhe aus dem Seitenverhältnis', () => {
-    expect(heightForAspect(40, 800, 600, 5, 80)).toBe(30);
-    expect(heightForAspect(40, 100, 1000, 5, 80)).toBe(80);
+  it('setzt das Bild unverzerrt und mittig in das quadratische Raster', () => {
+    expect(containRect(800, 600, 40, 40)).toEqual({ x: 0, y: 5, w: 40, h: 30 });
+    expect(containRect(100, 200, 40, 40)).toEqual({ x: 10, y: 0, w: 20, h: 40 });
+    expect(containRect(500, 500, 40, 40)).toEqual({ x: 0, y: 0, w: 40, h: 40 });
   });
 });

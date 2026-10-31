@@ -219,11 +219,22 @@ class LogicChecker {
 
 /** Prüft ein beliebiges Rätsel und ordnet es einer Stufe zu (null = nicht ohne Raten lösbar). */
 export function classifyDifficulty(width: number, height: number, clues: Int8Array): GeneratorLevel | null {
+  return classifyPuzzle(width, height, clues)?.level ?? null;
+}
+
+/** Wie classifyDifficulty, liefert zusätzlich die Zahl der nötigen Vergleiche. */
+export function classifyPuzzle(width: number, height: number, clues: Int8Array):
+  { level: GeneratorLevel; comparisons: number } | null {
   const checker = new LogicChecker(width, height);
   for (const level of GENERATOR_LEVELS) {
-    if (checker.solvable(clues, maxComparisons(level, width, height))) return level;
+    if (checker.solvable(clues, maxComparisons(level, width, height))) return { level, comparisons: checker.comparisons };
   }
   return null;
+}
+
+/** Besonders schwer: mehr Vergleiche als ein Viertel der Zahlen – dann gibt es einen Totenschädel. */
+export function isDeadly(comparisons: number, clueCount: number): boolean {
+  return comparisons > clueCount / 4;
 }
 
 /**

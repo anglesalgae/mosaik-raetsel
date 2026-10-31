@@ -38,7 +38,9 @@ export function puzzleFromPattern(width: number, height: number, pattern: Uint8A
       width, height, clues: result.clues,
       solution: Uint8Array.from(pattern, v => (v ? Cell.Filled : Cell.Empty)),
       title, author: '',
-      extra: result.quality === 'logic' ? { source, difficulty: result.level } : { source }
+      extra: result.quality === 'logic'
+        ? { source, difficulty: result.level, clueCount: result.clueCount, comparisons: result.comparisons }
+        : { source }
     },
     progress: null
   };
@@ -49,6 +51,8 @@ export interface RandomPuzzleOptions {
   height: number;
   level: GeneratorLevel;
   kind: MotifKind | 'any';
+  /** Text für das Motiv „Buchstaben“ (leer = zufälliges Wort). */
+  text?: string;
   seed?: number;
   onProgress?: (fraction: number) => void;
 }
@@ -64,14 +68,17 @@ export async function createRandomPuzzle(client: GeneratorClient, opts: RandomPu
   let fallback: CreatedPuzzle | null = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     // Motiv vorab prüfen: passt es grundsätzlich zur Stufe? (schnell, daher viele Versuche möglich)
-    let motif = generateMotif(opts.kind, opts.width, opts.height, seed);
+    const motifOpts = { text: opts.text };
+    let motif = generateMotif(opts.kind, opts.width, opts.height, seed, motifOpts);
     for (let k = 0; k < 40 && !canReachLevel(opts.width, opts.height, motif.pattern, opts.level); k++) {
       seed = (seed + 7349) >>> 0;
-      motif = generateMotif(opts.kind, opts.width, opts.height, seed);
+      motif = generateMotif(opts.kind, opts.width, opts.height, seed, motifOpts);
     }
     const result = await generateForLevel(client, opts.width, opts.height, motif.pattern, opts.level,
       f => opts.onProgress?.((attempt - 1 + f) / attempt));
-    const title = `${motifLabel(motif.kind)} ${String(motif.seed % 10000).padStart(4, '0')}`;
+    const text = opts.text?.trim();
+    const title = motif.kind === 'letters' && text ? text
+      : `${motifLabel(motif.kind)} ${String(motif.seed % 10000).padStart(4, '0')}`;
     const created = {
       parsed: puzzleFromPattern(opts.width, opts.height, motif.pattern, result, title, `Zufallsmotiv (${motif.kind}, Startwert ${motif.seed})`),
       result

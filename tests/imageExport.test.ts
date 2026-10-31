@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isDeadly } from '../src/core/generator';
 import { EXPORT_CELL, exportFileNames, exportLayout } from '../src/io/imageExport';
 
 describe('Bild-Export', () => {
@@ -20,10 +21,17 @@ describe('Bild-Export', () => {
     expect(L.height).toBe(L.gridHeight + L.header + 2 * L.margin);
   });
 
+  it('zeigt den Totenschädel erst bei mehr Vergleichen als einem Viertel der Zahlen', () => {
+    expect(isDeadly(0, 40)).toBe(false);
+    expect(isDeadly(10, 40)).toBe(false);
+    expect(isDeadly(11, 40)).toBe(true);
+  });
+
   it('hängt die Stufe als Kurzform an die Dateinamen', () => {
     expect(exportFileNames('Kleckse 2507', 'easy')).toEqual({
-      puzzle: 'kleckse-2507-00-aufgabe.jpg', solution: 'kleckse-2507-00-loesung.jpg'
+      puzzle: 'kleckse-2507-00-aufgabe.jpg', solution: 'kleckse-2507-00-loesung.jpg', json: 'kleckse-2507-00.json'
     });
+    expect(exportFileNames('Kleckse 2507', null).json).toBe('kleckse-2507.json');
     expect(exportFileNames('Kleckse 2507', 'moderate').puzzle).toBe('kleckse-2507-05-aufgabe.jpg');
     expect(exportFileNames('Kleckse 2507', 'medium').solution).toBe('kleckse-2507-10-loesung.jpg');
     expect(exportFileNames('Kleckse 2507', null).puzzle).toBe('kleckse-2507-aufgabe.jpg');

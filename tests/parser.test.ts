@@ -22,6 +22,12 @@ describe('Parser', () => {
     expect(Array.from(puzzle.clues)).toEqual([1, -1, 2, -1, -1, -1]);
   });
 
+  it('behält Stufe, Anzahl der Zahlen und Vergleiche beim Speichern und Laden', () => {
+    const { puzzle } = parsePuzzleObject({ clues: ['1.', '.3'], difficulty: 'medium', clueCount: 2, comparisons: 1 });
+    const again = parsePuzzleText(toJson(toSaveFile({ puzzle }))).puzzle;
+    expect(again.extra).toMatchObject({ difficulty: 'medium', clueCount: 2, comparisons: 1 });
+  });
+
   it('meldet verständliche Fehler', () => {
     expect(() => parsePuzzleObject({ clues: ['12a'] })).toThrow(/Zeile 1, Spalte 3/);
     expect(() => parsePuzzleObject({ clues: ['12', '1'] })).toThrow(/Zeile 2 hat 1 Felder/);

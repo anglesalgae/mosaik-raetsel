@@ -26,6 +26,18 @@ describe('Motive', () => {
     });
   }
 
+  it('schreibt eigenen Text in Blockschrift', () => {
+    const a = generateMotif('letters', 30, 30, 5, { text: 'Anna' });
+    const b = generateMotif('letters', 30, 30, 9, { text: 'Anna' });
+    const c = generateMotif('letters', 30, 30, 5, { text: 'Otto' });
+    expect(a.kind).toBe('letters');
+    expect(fill(a.pattern)).toBeGreaterThan(0.1);
+    // Gleicher Text ergibt dieselben Buchstaben (nur der Rahmen kann sich unterscheiden)
+    const inner = (p: Uint8Array) => Array.from(p).filter((_, i) => i % 30 > 0 && i % 30 < 29 && i >= 30 && i < 870);
+    expect(inner(a.pattern)).toEqual(inner(b.pattern));
+    expect(inner(a.pattern)).not.toEqual(inner(c.pattern));
+  });
+
   it('ist reproduzierbar', () => {
     const a = generateMotif('any', 20, 20, 77), b = generateMotif('any', 20, 20, 77);
     expect(a.kind).toBe(b.kind);

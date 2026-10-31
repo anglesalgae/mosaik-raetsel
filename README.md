@@ -234,7 +234,7 @@ Die Adresse hinter **Hosting URL** ist die Adresse deiner App. Sie ist zusätzli
 1. Die Hosting-URL im Browser öffnen. Es erscheint das Beispielrätsel „Segelboot“.
 2. Kurz testen:
    - **Zufallsrätsel** anklicken – nach einem Moment erscheint ein neues Rätsel.
-   - **Ersteller…** → **Aufgabe + Lösung als JPG** – zwei Bilder werden heruntergeladen (manche Browser fragen beim ersten Mal, ob mehrere Downloads erlaubt sind).
+   - **Ersteller…** → **Rätsel erstellen** → **Aufgabe + Lösung als JPG** – zwei Bilder werden heruntergeladen (manche Browser fragen beim ersten Mal, ob mehrere Downloads erlaubt sind).
 3. Die Adresse auch auf dem Handy öffnen; die App passt sich der Bildschirmgröße an.
 4. Zum Teilen genügt die Adresse. Tipp: Im Browser lässt sich die App als Lesezeichen speichern oder auf dem Handy über **Zum Startbildschirm hinzufügen** wie eine App ablegen.
 
@@ -320,7 +320,9 @@ src/
     generator.ts          Rätsel-Generator: Zahlen aus Raster, Ausdünnen
     generator.worker.ts   Generator im Web Worker
     generatorClient.ts    Promise-Schnittstelle zum Generator (abbrechbar)
-    motifs.ts             Motiv-Generator: Kleckse, Pixelfigur, Geometrie, Wellen, Mandala, Labyrinth
+    motifs.ts             Motiv-Generator (Kleckse, Labyrinth, Landschaft, Figuren, Buchstaben …)
+    silhouettes.ts        Formen für das Motiv „Figuren“
+    pixelFont.ts          Pixelschrift 5 × 7 für das Motiv „Buchstaben“
     puzzleFactory.ts      Zufallsrätsel erzeugen, Rätsel aus Raster zusammensetzen
     random.ts             Reproduzierbarer Zufallsgenerator
     emitter.ts            Typisierter Event-Emitter
@@ -379,6 +381,14 @@ Motivarten:
 | Wellen | Verzerrte Streifen in zufälliger Richtung |
 | Mandala | Radialsymmetrisches Muster |
 | Labyrinth | Echtes Labyrinth mit Ein- und Ausgang; dünne Wände ergeben meist knifflige, dicke Wände leichtere Rätsel |
+| Landschaft | Hügel- oder Bergsilhouette mit Sonne oder Mondsichel, Wolken und Tannen |
+| Höhlen | Gestein mit Hohlräumen, fester Rand; zerklüfteter als Kleckse |
+| Schneeflocke | Sechs- oder achtfach symmetrischer Kristall mit Seitenzweigen |
+| Fliesen | Symmetrische Kachel (Rauten, Kreise, Ringe, Kreuze, Sterne), über das Raster wiederholt, teils im Schachbrettwechsel |
+| Spirale | Spirale mit einem bis drei Armen |
+| Figuren | Silhouetten von Herz, Stern, Haus, Fisch, Katze, Vogel, Tasse, Baum, Mond, Apfel und Pilz – einzeln groß oder als Gruppe |
+| Buchstaben | Eigener Text (Feld „Text“) oder ein zufälliges Wort in Blockschrift, teils mit Rahmen; zu langer Text wird am Rand abgeschnitten |
+| Op-Art | Streifen, Ringe oder Schachbrett, von einer „Linse“ verzerrt |
 
 Jedes Motiv wird aus einem Startwert erzeugt und ist damit reproduzierbar; er steht in der gespeicherten Datei unter `source`. Ergibt ein Motiv kein eindeutig lösbares Rätsel, versucht die App automatisch ein anderes.
 
@@ -391,19 +401,20 @@ Jedes Motiv wird aus einem Startwert erzeugt und ist damit reproduzierbar; er st
 
 In beiden Fällen kannst du Felder in der Vorschau umschalten und Größe, Titel und Schwierigkeit festlegen. Dann:
 
-- **Rätsel erstellen und spielen** lädt das Rätsel ins Spielfeld und schließt den Dialog.
-- **Aufgabe + Lösung als JPG** erzeugt das Rätsel und speichert zwei druckfertige Bilder: `<titel>-<kürzel>-aufgabe.jpg` (leeres Raster mit Zahlen) und `<titel>-<kürzel>-loesung.jpg` (ausgefülltes Raster mit Zahlen), z. B. `kleckse-1518-05-aufgabe.jpg`. Kürzel: `00` = Normal, `05` = Fortgeschritten, `10` = Knifflig. Dialog und Motiv bleiben bestehen: Du kannst dasselbe Motiv gleich noch in einer anderen Stufe speichern und mit „Neues Motiv“ zum nächsten wechseln. Weicht die erreichte Stufe von der gewünschten ab, weist die Meldung darauf hin.
+- **Rätsel erstellen** legt die Zahlen für das aktuelle Raster fest. Die Meldung nennt die Zahl der Hinweise und die erreichte Stufe. Erst danach lassen sich die beiden anderen Buttons benutzen. Ändert sich danach das Raster oder die Schwierigkeit, muss das Rätsel neu erstellt werden; den Titel kannst du noch ändern.
+- **Spielen** lädt das erstellte Rätsel ins Spielfeld und schließt den Dialog.
+- **Aufgabe + Lösung als JPG** speichert das erstellte Rätsel als zwei druckfertige Bilder: `<titel>-<kürzel>-aufgabe.jpg` (leeres Raster mit Zahlen) und `<titel>-<kürzel>-loesung.jpg` (ausgefülltes Raster mit Zahlen), z. B. `kleckse-1518-05-aufgabe.jpg`. Kürzel: `00` = Normal, `05` = Fortgeschritten, `10` = Knifflig. Zusätzlich wird das Rätsel mit Lösung als `<titel>-<kürzel>.json` gespeichert, sodass es sich später wieder laden und spielen lässt. Dialog und Motiv bleiben bestehen: Du kannst dasselbe Motiv in einer anderen Stufe erstellen und speichern und mit „Neues Motiv“ zum nächsten wechseln. Weicht die erreichte Stufe von der gewünschten ab, weist die Meldung darauf hin.
 
-Kleine Rätsel werden etwa 2000 px groß gezeichnet und eignen sich für den Druck auf A4. Die Titelzeile zeigt links den Titel und rechts die Größe (z. B. „20 × 20“) sowie eine Raute für die Schwierigkeit: ◇ leer = Normal, linke Hälfte gefüllt (senkrecht geteilt) = Fortgeschritten, ◆ gefüllt = Knifflig. Manche Browser fragen beim ersten Mal, ob mehrere Downloads erlaubt sind.
+Jedes Kästchen ist in allen Bildern gleich groß (30 px), sodass sich alle Bilder mit demselben Maßstab vergrößern oder verkleinern lassen; rings herum bleibt nur ein schmaler weißer Rand. Die Titelzeile zeigt links den Titel und rechts die Größe (z. B. „20 × 20“) sowie eine Raute für die Schwierigkeit: ◇ leer = Normal, linke Hälfte gefüllt (senkrecht geteilt) = Fortgeschritten, ◆ gefüllt = Knifflig. Braucht das Rätsel Vergleiche, steht davor deren Anzahl mit zwei überlappenden Kreisen als Symbol. Sind es mehr Vergleiche als ein Viertel der Zahlen, ersetzt ein Totenschädel die Raute. Manche Browser fragen beim ersten Mal, ob mehrere Downloads erlaubt sind.
 
 ### Aus einem Bild
 
 1. Bild wählen. Am besten eignen sich klare Formen mit gutem Kontrast, etwa Logos, Piktogramme oder Silhouetten.
-2. Rastergröße einstellen (5–80 Felder je Seite). Die Höhe folgt auf Wunsch dem Seitenverhältnis.
+2. Rastergröße einstellen (5–80 Felder je Seite). Rätsel sind immer quadratisch; ein nicht quadratisches Bild wird unverzerrt in die Mitte gesetzt, der Rest bleibt weiß.
 3. Die **Schwelle** bestimmt, ab welcher Helligkeit ein Feld gefüllt wird. „Auto“ wählt sie automatisch (Otsu-Verfahren). „Hell und dunkel tauschen“ kehrt das Bild um, „Einzelne Pixel glätten“ entfernt Ausreißer.
 4. In der Vorschau lassen sich Felder per Klick oder Ziehen umschalten. Ohne Bild kann man dort auch frei zeichnen.
 5. Wer das Motiv lieber selbst nachzeichnen möchte: **Automatische Felder entfernen** entfernt die aus dem Bild erzeugten Felder, das Bild bleibt als Vorlage hinterlegt. Von Hand gesetzte Felder bleiben dabei erhalten. Dann die gewünschten Felder per Klick oder Ziehen füllen. Derselbe Button heißt danach **Automatische Felder wiederherstellen** und holt die erzeugten Felder zurück (selbst gezeichnete Felder bleiben dabei erhalten). Auch eine Änderung an Schwelle, Umkehrung oder Glättung stellt die automatischen Felder wieder her.
-6. **Schwierigkeit** wählen und „Rätsel erstellen und spielen“ bzw. „Aufgabe + Lösung als JPG“.
+6. **Schwierigkeit** wählen, „Rätsel erstellen“ klicken und dann „Spielen“ oder „Aufgabe + Lösung als JPG“.
 
 Der Generator startet mit allen Zahlen und entfernt sie in zufälliger Reihenfolge, solange das Rätsel ohne Raten eindeutig lösbar bleibt:
 
@@ -413,7 +424,7 @@ Der Generator startet mit allen Zahlen und entfernt sie in zufälliger Reihenfol
 | Fortgeschritten | Zusätzlich sehr wenige Vergleiche zweier überlappender Zahlen: höchstens 2 bei kleinen, höchstens 6 bei großen Rätseln |
 | Knifflig | Beliebig viele Vergleiche |
 
-Die Stufe richtet sich nach den tatsächlich nötigen Vergleichen: 0 = Normal, bis zur Obergrenze = Fortgeschritten, darüber = Knifflig. Die Statusmeldung nach dem Erstellen nennt die Stufe und die Zahl der nötigen Vergleiche; in der JSON-Datei steht die Stufe unter `difficulty` (`easy`, `moderate`, `medium`). Die gewählte Stufe wird eingehalten: Fällt ein Rätsel zu leicht aus, verteilt die App die Zahlen neu. Kann ein Zufallsmotiv die Stufe grundsätzlich nicht erreichen (z. B. dünnwandige Labyrinthe bei „Normal“), nimmt „Rätsel erstellen und spielen“ bzw. „Zufallsrätsel“ ein anderes Motiv derselben Art – die Meldung sagt das dann. Bei eigenen Bildern, von Hand geänderten Motiven und beim Speichern als JPG bleibt das Motiv erhalten; ist die Stufe dort nicht erreichbar, weist die Meldung darauf hin.
+Die Stufe richtet sich nach den tatsächlich nötigen Vergleichen: 0 = Normal, bis zur Obergrenze = Fortgeschritten, darüber = Knifflig. Die Statusmeldung nach dem Erstellen nennt die Stufe und die Zahl der nötigen Vergleiche; in der JSON-Datei steht die Stufe unter `difficulty` (`easy`, `moderate`, `medium`). Die gewählte Stufe wird eingehalten: Fällt ein Rätsel zu leicht aus, verteilt die App die Zahlen neu. Kann ein Zufallsmotiv die Stufe grundsätzlich nicht erreichen (z. B. dünnwandige Labyrinthe bei „Normal“), nimmt „Rätsel erstellen“ bzw. „Zufallsrätsel“ ein anderes Motiv derselben Art – die Vorschau zeigt es, die Meldung sagt das dann. Bei eigenen Bildern, von Hand geänderten Motiven und Motiven, die schon als JPG gespeichert wurden, bleibt das Motiv erhalten; ist die Stufe dort nicht erreichbar, weist die Meldung darauf hin.
 
 Die Berechnung läuft in einem Web Worker; ein 60 × 60-Raster dauert wenige Sekunden. Das erzeugte Rätsel enthält die Lösung und lässt sich wie jedes andere mit „Stand speichern“ als JSON sichern.
 

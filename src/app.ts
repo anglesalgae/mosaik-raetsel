@@ -2,7 +2,7 @@ import { Game } from './core/game';
 import { nextHint } from './core/hints';
 import { FormatError, parsePuzzleObject, parsePuzzleText } from './core/parser';
 import { fileNameFor, toJson, toSaveFile } from './core/serializer';
-import { classifyDifficulty, isGeneratorLevel, type GeneratorLevel } from './core/generator';
+import { classifyPuzzle, isDeadly, isGeneratorLevel, type GeneratorLevel } from './core/generator';
 import { GeneratorClient } from './core/generatorClient';
 import { createRandomPuzzle, type CreatedPuzzle } from './core/puzzleFactory';
 import { SolverClient } from './core/solverClient';
@@ -109,6 +109,7 @@ export class App {
       this.sidebar.setHintPending(false);
       this.hideSolution();
       this.header.setPuzzle(g.puzzle.title, g.width, g.height);
+      this.header.setNote(this.storedSummary());
       this.showDifficulty();
       this.sidebar.setPuzzleInfo(g.puzzle, g.model.clueCells.length);
       this.sidebar.setSolveInfo('pending', false, false);
@@ -148,17 +149,38 @@ export class App {
     this.board.requestDraw();
   }
 
+  /**
+   * Angaben für die Kopfzeile aus den in der Datei gespeicherten Werten (Stufe, Zahlen, Vergleiche),
+   * damit sie nach dem Laden genauso erscheinen wie nach dem Erstellen. null, wenn sie fehlen.
+   */
+  private storedSummary(): string | null {
+    const { puzzle, model } = this.game;
+    const { difficulty, clueCount, comparisons } = puzzle.extra;
+    if (!isGeneratorLevel(difficulty) || typeof comparisons !== 'number') return null;
+    const clues = typeof clueCount === 'number' ? clueCount : model.clueCells.length;
+    const needed = comparisons ? `, ${comparisons === 1 ? '1 Vergleich' : `${comparisons} Vergleiche`} nötig` : '';
+    return `„${puzzle.title}“: ${puzzle.width} × ${puzzle.height}, ${clues} Zahlen, ohne Raten lösbar. Stufe ${LEVEL_NAMES[difficulty]}${needed}.`;
+  }
+
   /** Schwierigkeit in der Titelzeile: aus der Datei, sonst aus den Zahlen bestimmt. */
   private showDifficulty(): void {
     const g = this.game;
     const stored = g.puzzle.extra.difficulty;
-    if (isGeneratorLevel(stored)) { this.header.setDifficulty(stored); return; }
-    this.header.setDifficulty(null);
+    const storedComparisons = g.puzzle.extra.comparisons;
+    const clueCount = g.model.clueCells.length;
+    if (isGeneratorLevel(stored) && typeof storedComparisons === 'number') {
+      this.header.setDifficulty(stored, isDeadly(storedComparisons, clueCount));
+      return;
+    }
+    // Ohne gespeicherte Vergleiche: Stufe aus der Datei zeigen, Vergleiche nachrechnen
+    this.header.setDifficulty(isGeneratorLevel(stored) ? stored : null);
     const puzzle = g.puzzle;
     // Etwas später berechnen, damit das Spielfeld sofort erscheint
     setTimeout(() => {
       if (g.puzzle !== puzzle) return;
-      this.header.setDifficulty(classifyDifficulty(puzzle.width, puzzle.height, puzzle.clues));
+      const found = classifyPuzzle(puzzle.width, puzzle.height, puzzle.clues);
+      const level = isGeneratorLevel(stored) ? stored : found?.level ?? null;
+      this.header.setDifficulty(level, !!found && isDeadly(found.comparisons, clueCount));
     }, 30);
   }
 
@@ -215,7 +237,9 @@ export class App {
     }
     if (note) levelNote += note;
     this.loadParsed(parsed, null);
-    this.status.show(`„${parsed.puzzle.title}“ erstellt: ${width} × ${height}, ${result.clueCount} Zahlen, ${how}.${levelNote} Mit „Stand speichern“ sicherst du es als JSON.`, 'success');
+    // Bleibt in der Kopfzeile stehen, solange das Rätsel geladen ist
+    this.header.setNote(`„${parsed.puzzle.title}“ erstellt: ${width} × ${height}, ${result.clueCount} Zahlen, ${how}.${levelNote}`);
+    this.status.show('');
   }
 
   /** Erzeugt mit einem Klick ein neues Rätsel (Einstellungen aus dem Ersteller). */

@@ -1,13 +1,19 @@
-import type { GeneratorLevel } from '../core/generator';
-import { fileNameFor } from '../core/serializer';
+import { isDeadly, type GeneratorLevel } from '../core/generator';
+import { fileNameFor, toJson, toSaveFile } from '../core/serializer';
 import { Cell, type Puzzle } from '../core/types';
-import { downloadBlob } from './files';
+import { downloadBlob, downloadText } from './files';
 
 /**
  * Export von Aufgabe und Lösung als Bild (z. B. zum Drucken).
  * Verwendet feste, druckfreundliche Farben – unabhängig vom Hell/Dunkel-Modus.
  */
 export type ExportKind = 'puzzle' | 'solution';
+
+/** Stufe und Zahl der nötigen Vergleiche für die Titelzeile. */
+export interface ExportDifficulty {
+  level: GeneratorLevel;
+  comparisons: number;
+}
 
 const COLORS = {
   background: '#FFFFFF',
@@ -97,9 +103,58 @@ export function drawDifficultyDiamond(ctx: CanvasRenderingContext2D, cx: number,
   ctx.restore();
 }
 
+/** Symbol für Vergleiche: zwei überlappende Kreise, die gemeinsame Fläche gefüllt. */
+export function drawComparisonIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number,
+  color = COLORS.ink): void {
+  // Stark überlappend, damit das Symbol nicht breiter wird als die Raute
+  const r = size * 0.36;
+  const dx = r * 0.4;
+  const left = new Path2D(), right = new Path2D();
+  left.arc(cx - dx, cy, r, 0, Math.PI * 2);
+  right.arc(cx + dx, cy, r, 0, Math.PI * 2);
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.save();
+  ctx.clip(left);
+  ctx.fill(right);
+  ctx.restore();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2, size / 11);
+  ctx.stroke(left);
+  ctx.stroke(right);
+  ctx.restore();
+}
+
+/** Totenschädel für besonders schwere Rätsel (siehe isDeadly). */
+export function drawSkull(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number,
+  color = COLORS.ink): void {
+  const s = size;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, cy - s * 0.1, s * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(cx - s * 0.22, cy + s * 0.1, s * 0.44, s * 0.36);
+  // Augen, Nase und Zähne ausgespart
+  ctx.fillStyle = COLORS.background;
+  for (const ex of [-0.15, 0.15]) {
+    ctx.beginPath();
+    ctx.arc(cx + s * ex, cy - s * 0.06, s * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + s * 0.04);
+  ctx.lineTo(cx + s * 0.06, cy + s * 0.16);
+  ctx.lineTo(cx - s * 0.06, cy + s * 0.16);
+  ctx.closePath();
+  ctx.fill();
+  for (const tx of [-0.11, 0, 0.11]) ctx.fillRect(cx + s * tx - s * 0.02, cy + s * 0.3, s * 0.04, s * 0.16);
+  ctx.restore();
+}
+
 /** Zeichnet Aufgabe oder Lösung auf ein neues Canvas. */
 export function renderPuzzleImage(puzzle: Puzzle, solution: Uint8Array | null, kind: ExportKind,
-  difficulty: GeneratorLevel | null = null): HTMLCanvasElement {
+  difficulty: ExportDifficulty | null = null): HTMLCanvasElement {
   if (kind === 'solution' && !solution) throw new Error('Für dieses Rätsel ist keine Lösung bekannt.');
   const { width: cols, height: rows, clues } = puzzle;
   const L = exportLayout(cols, rows);
@@ -114,22 +169,38 @@ export function renderPuzzleImage(puzzle: Puzzle, solution: Uint8Array | null, k
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, L.width, L.height);
 
-  // Titelzeile: links der Titel, rechts die Größe und die Schwierigkeits-Raute
+  // Titelzeile: links der Titel, rechts die Größe, die Zahl der Vergleiche und die Stufe
+  // (Raute bzw. Totenschädel) – von rechts nach links gesetzt
   const baseline = L.margin + L.titleSize;
   const right = L.width - L.margin;
-  const diamond = Math.round(L.infoSize * 1.05);
+  const icon = Math.round(L.infoSize * 1.05);
+  const iconY = baseline - L.infoSize * 0.36;
   const gap = Math.round(L.infoSize * 0.6);
   ctx.textBaseline = 'alphabetic';
-  ctx.font = `700 ${L.infoSize}px ${FONT}`;
-  const sizeText = `${cols} × ${rows}`;
-  const sizeWidth = ctx.measureText(sizeText).width;
-  const sizeRight = difficulty ? right - diamond - gap : right;
-  ctx.fillStyle = COLORS.muted;
   ctx.textAlign = 'right';
-  ctx.fillText(sizeText, sizeRight, baseline);
-  if (difficulty) drawDifficultyDiamond(ctx, right - diamond / 2, baseline - L.infoSize * 0.36, diamond, difficulty);
+  ctx.font = `700 ${L.infoSize}px ${FONT}`;
+  let x = right;
+  if (difficulty) {
+    const clueCount = clues.reduce((n, c) => n + (c >= 0 ? 1 : 0), 0);
+    if (isDeadly(difficulty.comparisons, clueCount)) drawSkull(ctx, x - icon / 2, iconY, icon);
+    else drawDifficultyDiamond(ctx, x - icon / 2, iconY, icon, difficulty.level);
+    x -= icon + gap;
+    if (difficulty.comparisons > 0) {
+      const count = String(difficulty.comparisons);
+      ctx.fillStyle = COLORS.muted;
+      ctx.fillText(count, x, baseline);
+      x -= ctx.measureText(count).width + Math.round(gap * 0.3);
+      const venn = icon;
+      drawComparisonIcon(ctx, x - venn / 2, iconY, venn, COLORS.muted);
+      x -= venn + gap;
+    }
+  }
+  const sizeText = `${cols} × ${rows}`;
+  ctx.fillStyle = COLORS.muted;
+  ctx.fillText(sizeText, x, baseline);
+  x -= ctx.measureText(sizeText).width;
 
-  const infoWidth = sizeWidth + (difficulty ? gap + diamond : 0);
+  const infoWidth = right - x;
   ctx.textAlign = 'left';
   ctx.fillStyle = COLORS.ink;
   ctx.font = `700 ${L.titleSize}px ${FONT}`;
@@ -190,25 +261,26 @@ export async function ensureExportFont(): Promise<void> {
 /** Kurzform der Stufe für Dateinamen: 00 = Normal, 05 = Fortgeschritten, 10 = Knifflig. */
 export const LEVEL_CODES: Record<GeneratorLevel, string> = { easy: '00', moderate: '05', medium: '10' };
 
-/** Dateinamen für Aufgabe und Lösung, z. B. „kleckse-2507-05-aufgabe.jpg“. */
-export function exportFileNames(title: string, difficulty: GeneratorLevel | null): { puzzle: string; solution: string } {
+/** Dateinamen für Aufgabe, Lösung und JSON, z. B. „kleckse-2507-05-aufgabe.jpg“ und „kleckse-2507-05.json“. */
+export function exportFileNames(title: string, difficulty: GeneratorLevel | null): { puzzle: string; solution: string; json: string } {
   const code = difficulty ? `-${LEVEL_CODES[difficulty]}` : '';
   return {
     puzzle: fileNameFor(title, `${code}-aufgabe`, 'jpg'),
-    solution: fileNameFor(title, `${code}-loesung`, 'jpg')
+    solution: fileNameFor(title, `${code}-loesung`, 'jpg'),
+    json: fileNameFor(title, code, 'json')
   };
 }
 
 /**
- * Speichert Aufgabe und (falls bekannt) Lösung als zwei JPG-Dateien.
+ * Speichert Aufgabe und (falls bekannt) Lösung als zwei JPG-Dateien, dazu das Rätsel als JSON.
  * Gibt die Dateinamen zurück.
  */
 export async function downloadPuzzleImages(puzzle: Puzzle, solution: Uint8Array | null,
-  difficulty: GeneratorLevel | null): Promise<string[]> {
+  difficulty: ExportDifficulty | null): Promise<string[]> {
   await ensureExportFont();
   const names: string[] = [];
   // Stufe im Dateinamen, damit dasselbe Motiv in mehreren Stufen gespeichert werden kann
-  const fileNames = exportFileNames(puzzle.title, difficulty);
+  const fileNames = exportFileNames(puzzle.title, difficulty?.level ?? null);
   const puzzleName = fileNames.puzzle;
   downloadBlob(puzzleName, await canvasToJpeg(renderPuzzleImage(puzzle, null, 'puzzle', difficulty)));
   names.push(puzzleName);
@@ -219,5 +291,9 @@ export async function downloadPuzzleImages(puzzle: Puzzle, solution: Uint8Array 
     downloadBlob(solutionName, await canvasToJpeg(renderPuzzleImage(puzzle, solution, 'solution', difficulty)));
     names.push(solutionName);
   }
+  // Dazu das Rätsel mit Lösung als JSON, damit es sich später wieder laden lässt
+  await new Promise(r => setTimeout(r, 400));
+  downloadText(fileNames.json, toJson(toSaveFile({ puzzle })));
+  names.push(fileNames.json);
   return names;
 }

@@ -1,4 +1,5 @@
 /** Lädt Bilder und tastet sie in ein grobes Raster aus Helligkeitswerten ab. */
+import { containRect } from './pattern';
 
 export interface LoadedImage {
   image: HTMLImageElement;
@@ -48,7 +49,9 @@ export function sampleLuminance(img: LoadedImage, cols: number, rows: number): F
   ctx.fillRect(0, 0, cw, ch);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img.image, 0, 0, cw, ch);
+  // Unverzerrt und mittig; überstehende Ränder bleiben weiß
+  const r = containRect(img.width, img.height, cw, ch);
+  ctx.drawImage(img.image, r.x, r.y, r.w, r.h);
   const data = ctx.getImageData(0, 0, cw, ch).data;
 
   const out = new Float32Array(cols * rows);

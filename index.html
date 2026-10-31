@@ -16,7 +16,7 @@
       <span class="logo" aria-hidden="true"><i></i><i class="o"></i><i></i><i class="o"></i><i class="a"></i><i class="o"></i><i></i><i></i><i></i></span>
       <span class="wordmark">Mosaik</span>
     </div>
-    <div class="meta"><h1 id="pTitle">–</h1><span id="pSub"></span><span class="level" id="pLevel" hidden></span></div>
+    <div class="meta"><h1 id="pTitle">–</h1><span id="pSub"></span><span class="level" id="pLevel" hidden></span><span class="note" id="pNote" hidden></span></div>
     <div class="stats">
       <span class="timer" id="timer" title="Spielzeit">0:00</span>
       <div class="prog" title="Entschiedene Felder"><span id="progBar"></span></div>
@@ -143,6 +143,9 @@
               <option value="any">Überraschung</option>
             </select>
           </label>
+          <label class="field" id="cTextField" hidden>Text
+            <input type="text" id="cText" maxlength="40" placeholder="leer = zufälliges Wort">
+          </label>
           <button type="button" id="cNewMotif">Neues Motiv</button>
         </div>
 
@@ -151,7 +154,6 @@
           <button type="button" id="cImgBtn" class="primary">Bild wählen…</button>
           <input type="file" id="cImgInput" accept="image/*" hidden>
           <span class="note" id="cImgName">Kein Bild gewählt.</span>
-          <label class="check"><input type="checkbox" id="cKeep" checked> Seitenverhältnis beibehalten</label>
           <div class="field">
             <span class="field-row"><label for="cThr">Schwelle</label> <output id="cThrVal">128</output></span>
             <div class="thr-row"><input type="range" id="cThr" min="1" max="254" value="128"><button type="button" id="cAuto">Auto</button></div>
@@ -161,10 +163,7 @@
           <label class="check"><input type="checkbox" id="cUnderlay" checked> Bild in der Vorschau hinterlegen</label>
         </div>
 
-        <div class="row2">
-          <label class="field">Breite <input type="number" id="cW" min="5" max="80" value="20"></label>
-          <label class="field">Höhe <input type="number" id="cH" min="5" max="80" value="20"></label>
-        </div>
+        <label class="field">Größe (Felder je Seite) <input type="number" id="cSize" min="5" max="80" value="20"></label>
         <label class="field">Titel <input type="text" id="cTitle" placeholder="Eigenes Motiv" maxlength="80"></label>
         <label class="field">Schwierigkeit
           <select id="cLevel">
@@ -173,12 +172,12 @@
             <option value="medium">Knifflig – mit Vergleichen</option>
           </select>
         </label>
+        <button type="button" id="cClearEdits" hidden>Handänderungen verwerfen</button>
       </div>
       <div class="create-preview" id="cPreviewBox">
         <canvas id="cPreview" aria-label="Vorschau des Rasters"></canvas>
         <p class="note" id="cStats"></p>
         <div class="preview-opts">
-          <button type="button" id="cClearEdits">Handänderungen verwerfen</button>
           <button type="button" id="cBlank" hidden title="Entfernt die automatisch aus dem Bild erzeugten Felder. Das Bild bleibt als Vorlage sichtbar, sodass du die Felder selbst setzen kannst.">Automatische Felder entfernen</button>
         </div>
         <p class="note">Klicke oder ziehe in der Vorschau, um Felder umzuschalten.</p>
@@ -188,8 +187,9 @@
     <div class="msg" id="cMsg"></div>
     <div class="actions">
       <button value="cancel">Schließen</button>
-      <button type="button" id="cJpg" title="Erzeugt das Rätsel und speichert Aufgabe und Lösung als zwei JPG-Dateien. Der Dialog bleibt offen.">Aufgabe + Lösung als JPG</button>
-      <button type="button" id="cCreate" class="primary">Rätsel erstellen und spielen</button>
+      <button type="button" id="cCreate" class="primary" title="Legt die Zahlen für das aktuelle Raster in der gewählten Schwierigkeit fest.">Rätsel erstellen</button>
+      <button type="button" id="cJpg" disabled title="Speichert Aufgabe und Lösung des erstellten Rätsels als zwei JPG-Dateien. Der Dialog bleibt offen.">Aufgabe + Lösung als JPG</button>
+      <button type="button" id="cPlay" disabled title="Lädt das erstellte Rätsel ins Spielfeld.">Spielen</button>
     </div>
   </form>
 </dialog>

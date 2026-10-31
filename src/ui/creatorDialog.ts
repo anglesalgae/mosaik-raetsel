@@ -5,7 +5,7 @@ import { generateForLevel, puzzleFromPattern, type CreatedPuzzle, type RandomPuz
 import { newSeed } from '../core/random';
 import { downloadPuzzleImages } from '../io/imageExport';
 import { loadImageFile, sampleLuminance, type LoadedImage } from '../image/imageSampler';
-import { fillRatio, heightForAspect, otsuThreshold, smoothPattern, toPattern } from '../image/pattern';
+import { containRect, fillRatio, otsuThreshold, smoothPattern, toPattern } from '../image/pattern';
 import { LEVEL_NAMES } from './difficulty';
 import { byId } from './dom';
 import { readPalette } from './theme';
@@ -26,12 +26,14 @@ export class CreatorDialog {
   private motifOpts = byId('cMotifOpts');
   private imageOpts = byId('cImageOpts');
   private kindIn = byId<HTMLSelectElement>('cKind');
+  /** Eigener Text für das Motiv „Buchstaben“. */
+  private textField = byId('cTextField');
+  private textIn = byId<HTMLInputElement>('cText');
   private fileInput = byId<HTMLInputElement>('cImgInput');
   private imgName = byId('cImgName');
   private titleIn = byId<HTMLInputElement>('cTitle');
-  private widthIn = byId<HTMLInputElement>('cW');
-  private heightIn = byId<HTMLInputElement>('cH');
-  private keepIn = byId<HTMLInputElement>('cKeep');
+  /** Rätsel sind immer quadratisch: eine Zahl für Breite und Höhe. */
+  private sizeIn = byId<HTMLInputElement>('cSize');
   private thrIn = byId<HTMLInputElement>('cThr');
   private thrVal = byId('cThrVal');
   private invIn = byId<HTMLInputElement>('cInv');
@@ -45,8 +47,11 @@ export class CreatorDialog {
   private progress = byId('cProgress');
   private createBtn = byId<HTMLButtonElement>('cCreate');
   private jpgBtn = byId<HTMLButtonElement>('cJpg');
-  /** Anzahl der in dieser Sitzung gespeicherten Bildpaare. */
-  private savedCount = 0;
+  private playBtn = byId<HTMLButtonElement>('cPlay');
+  /** Zuletzt erstelltes Rätsel; wird verworfen, sobald sich Raster oder Schwierigkeit ändern. */
+  private created: CreatedPuzzle | null = null;
+  /** Startwert des Motivs, das schon als Bild gespeichert wurde – es wird dann nicht mehr ausgetauscht. */
+  private savedSeed: number | null = null;
 
   private generator = new GeneratorClient();
   private source: Source = 'motif';
@@ -62,6 +67,7 @@ export class CreatorDialog {
   /** Bild-Modus: automatisch erzeugte Felder entfernt – nur das Bild dient als Vorlage. */
   private blank = false;
   private blankBtn = byId<HTMLButtonElement>('cBlank');
+  private clearEditsBtn = byId<HTMLButtonElement>('cClearEdits');
   private cellPx = 16;
   private paintValue: number | null = null;
   private busy = false;
@@ -72,7 +78,15 @@ export class CreatorDialog {
 
     document.querySelectorAll<HTMLInputElement>('input[name="cSrc"]').forEach(r =>
       r.addEventListener('change', () => this.setSource(r.value as Source)));
-    this.kindIn.addEventListener('change', () => this.newMotif());
+    this.kindIn.addEventListener('change', () => {
+      this.textField.hidden = this.kindIn.value !== 'letters';
+      this.newMotif();
+    });
+    this.textIn.addEventListener('input', () => {
+      this.edits.clear();
+      this.rebuild();
+      this.setAutoTitle(this.motifTitle());
+    });
     byId('cNewMotif').addEventListener('click', () => this.newMotif());
 
     byId('cImgBtn').addEventListener('click', () => this.fileInput.click());
@@ -82,9 +96,7 @@ export class CreatorDialog {
       this.fileInput.value = '';
     });
     this.titleIn.addEventListener('input', () => { this.titleIn.dataset.auto = '0'; });
-    this.widthIn.addEventListener('change', () => this.onSizeChange('width'));
-    this.heightIn.addEventListener('change', () => this.onSizeChange('height'));
-    this.keepIn.addEventListener('change', () => this.onSizeChange('width'));
+    this.sizeIn.addEventListener('change', () => this.onSizeChange());
     // Wer an Schwelle, Umkehrung oder Glättung dreht, möchte die automatischen Felder wieder sehen
     this.thrIn.addEventListener('input', () => { this.setBlank(false); this.rebuild(); });
     this.invIn.addEventListener('change', () => { this.setBlank(false); this.rebuild(); });
@@ -97,13 +109,15 @@ export class CreatorDialog {
       this.setBlank(false);
       this.rebuild();
     });
-    byId('cClearEdits').addEventListener('click', () => {
+    this.clearEditsBtn.addEventListener('click', () => {
       this.edits.clear();
       this.rebuild();
       this.say('');
     });
+    this.levelIn.addEventListener('change', () => this.discardCreated());
     this.createBtn.addEventListener('click', () => void this.create());
     this.jpgBtn.addEventListener('click', () => void this.saveImages());
+    this.playBtn.addEventListener('click', () => this.play());
     // Enter in einem Eingabefeld soll den Dialog nicht schließen
     this.form.addEventListener('submit', e => {
       if ((e.submitter as HTMLButtonElement | null)?.value !== 'cancel') e.preventDefault();
@@ -135,11 +149,13 @@ export class CreatorDialog {
 
   /** Einstellungen für ein Zufallsrätsel per Ein-Klick (Größe, Motiv, Schwierigkeit aus dem Dialog). */
   randomSettings(): Omit<RandomPuzzleOptions, 'onProgress' | 'seed'> {
+    const size = this.clampSize(this.sizeIn);
     return {
-      width: this.clampSize(this.widthIn),
-      height: this.clampSize(this.heightIn),
+      width: size,
+      height: size,
       level: this.levelIn.value as GeneratorLevel,
-      kind: this.kindIn.value as MotifKind | 'any'
+      kind: this.kindIn.value as MotifKind | 'any',
+      text: this.textIn.value
     };
   }
 
@@ -155,7 +171,7 @@ export class CreatorDialog {
     this.updateBlankButton();
     this.edits.clear();
     if (source === 'image') {
-      if (this.img) this.onSizeChange('width', false, true);
+      if (this.img) this.onSizeChange(false, true);
       else { this.lum = null; this.rebuild(); }
       this.setAutoTitle(this.img ? this.img.name : '');
     } else {
@@ -165,6 +181,8 @@ export class CreatorDialog {
   }
 
   private motifTitle(): string {
+    const text = this.textIn.value.trim();
+    if (this.motifKind === 'letters' && text) return text;
     return `${motifLabel(this.motifKind)} ${String(this.motifSeed % 10000).padStart(4, '0')}`;
   }
 
@@ -192,8 +210,7 @@ export class CreatorDialog {
       this.imgName.textContent = `${file.name} (${img.width} × ${img.height} px)`;
       this.edits.clear();
       this.setBlank(false);
-      this.keepIn.checked = true;
-      this.onSizeChange('width', false, true);
+      this.onSizeChange(false, true);
       if (this.lum) this.thrIn.value = String(otsuThreshold(this.lum));
       this.rebuild();
       this.setAutoTitle(img.name);
@@ -212,15 +229,8 @@ export class CreatorDialog {
     return clamped;
   }
 
-  private onSizeChange(changed: 'width' | 'height', announce = true, force = false): void {
-    let cols = this.clampSize(this.widthIn);
-    let rows = this.clampSize(this.heightIn);
-    if (this.source === 'image' && this.img && this.keepIn.checked) {
-      if (changed === 'width') rows = heightForAspect(cols, this.img.width, this.img.height, MIN_GRID, MAX_GRID);
-      else cols = heightForAspect(rows, this.img.height, this.img.width, MIN_GRID, MAX_GRID);
-      this.widthIn.value = String(cols);
-      this.heightIn.value = String(rows);
-    }
+  private onSizeChange(announce = true, force = false): void {
+    const cols = this.clampSize(this.sizeIn), rows = cols;
     if (!force && cols === this.cols && rows === this.rows) return;
     const hadEdits = this.edits.size > 0;
     this.cols = cols;
@@ -237,7 +247,8 @@ export class CreatorDialog {
     const n = this.cols * this.rows;
     let p: Uint8Array;
     if (this.source === 'motif') {
-      const motif = generateMotif(this.kindIn.value as MotifKind | 'any', this.cols, this.rows, this.motifSeed);
+      const motif = generateMotif(this.kindIn.value as MotifKind | 'any', this.cols, this.rows, this.motifSeed,
+        { text: this.textIn.value });
       this.motifKind = motif.kind;
       p = Uint8Array.from(motif.pattern);
     } else if (this.lum && !this.blank) {
@@ -248,6 +259,7 @@ export class CreatorDialog {
     }
     for (const [i, v] of this.edits) if (i < n) p[i] = v;
     this.pattern = p;
+    this.discardCreated();
     this.updateStats();
     this.draw();
   }
@@ -257,6 +269,8 @@ export class CreatorDialog {
     const edits = this.edits.size ? `, ${this.edits.size} von Hand geändert` : '';
     const blank = this.source === 'image' && this.blank ? ', automatische Felder entfernt' : '';
     this.stats.textContent = `${this.cols} × ${this.rows} Felder, ${pct} % gefüllt${edits}${blank}`;
+    // Verwerfen gibt es nur, wenn es Handänderungen gibt
+    this.clearEditsBtn.hidden = this.edits.size === 0;
   }
 
   /* ---------- Leeres Raster mit Bild als Vorlage ---------- */
@@ -320,7 +334,9 @@ export class CreatorDialog {
     const underlay = this.source === 'image' && this.img && this.underlayIn.checked;
     if (underlay && this.img) {
       ctx.globalAlpha = 0.45;
-      ctx.drawImage(this.img.image, 0, 0, w, h);
+      // Wie beim Abtasten: unverzerrt und mittig
+      const r = containRect(this.img.width, this.img.height, w, h);
+      ctx.drawImage(this.img.image, r.x, r.y, r.w, r.h);
       ctx.globalAlpha = 1;
     }
     ctx.fillStyle = P.fill;
@@ -378,6 +394,7 @@ export class CreatorDialog {
   private paintCell(i: number): void {
     this.edits.set(i, this.paintValue!);
     this.pattern[i] = this.paintValue!;
+    this.discardCreated();
     this.updateStats();
     this.draw();
   }
@@ -390,7 +407,32 @@ export class CreatorDialog {
       .forEach(el => { if (el.value !== 'cancel') el.disabled = busy; });
     this.progress.hidden = !busy;
     this.updateBlankButton();
-    this.createBtn.textContent = busy ? 'Wird erstellt…' : 'Rätsel erstellen und spielen';
+    this.updateActions();
+    this.createBtn.textContent = busy ? 'Wird erstellt…' : 'Rätsel erstellen';
+  }
+
+  /** Speichern und Spielen gibt es erst, wenn ein Rätsel zum aktuellen Raster erstellt ist. */
+  private updateActions(): void {
+    const ready = !this.busy && this.created !== null;
+    this.jpgBtn.disabled = !ready;
+    this.playBtn.disabled = !ready;
+    this.playBtn.classList.toggle('primary', this.created !== null);
+    this.createBtn.classList.toggle('primary', this.created === null);
+  }
+
+  /** Raster oder Schwierigkeit geändert: Das erstellte Rätsel passt nicht mehr. */
+  private discardCreated(): void {
+    if (!this.created) return;
+    this.created = null;
+    this.updateActions();
+    this.say('Das Raster oder die Schwierigkeit hat sich geändert. Klicke „Rätsel erstellen“, um die Zahlen neu festzulegen.');
+  }
+
+  /** Das erstellte Rätsel mit dem aktuellen Titel (der Titel darf sich nach dem Erstellen noch ändern). */
+  private currentCreated(): CreatedPuzzle | null {
+    if (!this.created) return null;
+    this.created.parsed.puzzle.title = this.titleIn.value.trim() || 'Eigenes Motiv';
+    return this.created;
   }
 
 /**
@@ -471,39 +513,53 @@ export class CreatorDialog {
     }
   }
 
-  /** Erzeugt das Rätsel, lädt es ins Spielfeld und schließt den Dialog. */
+  /**
+   * Erzeugt das Rätsel zum aktuellen Raster. Danach lässt es sich als Bild speichern und/oder spielen.
+   * Ein Motiv, das schon als Bild gespeichert wurde, wird nicht mehr ausgetauscht,
+   * damit es sich in weiteren Stufen speichern lässt.
+   */
   private create(): Promise<void> {
     return this.run(async () => {
-      const created = await this.generate(true);
+      this.created = null;
+      const created = await this.generate(this.savedSeed !== this.motifSeed);
       if (!created) return;
-      this.dlg.close();
-      this.onCreate(created);
-      this.prepareNextMotif();
+      this.created = created;
+      const { result } = created;
+      const difficulty = result.quality === 'logic' ? result.level : null;
+      const comparisons = result.comparisons === 1 ? '1 Vergleich' : `${result.comparisons} Vergleiche`;
+      const level = difficulty ? `Stufe ${LEVEL_NAMES[difficulty]}, ${comparisons}` : 'braucht Ausprobieren';
+      const requested = this.levelIn.value as GeneratorLevel;
+      const mismatch = difficulty && difficulty !== requested
+        ? ` Achtung: gewünscht war „${LEVEL_NAMES[requested]}“, dieses Motiv ergibt „${LEVEL_NAMES[difficulty]}“.`
+        : '';
+      this.say(`Rätsel erstellt: ${result.clueCount} Zahlen, ${level}.${created.note ?? ''}${mismatch}`, !!mismatch);
     });
   }
 
-  /**
-   * Erzeugt das Rätsel und speichert Aufgabe und Lösung als JPG. Dialog und Motiv bleiben
-   * bestehen, sodass sich dasselbe Motiv in weiteren Stufen speichern lässt.
-   */
+  /** Speichert Aufgabe und Lösung des erstellten Rätsels als JPG. Dialog und Motiv bleiben bestehen. */
   private saveImages(): Promise<void> {
     return this.run(async () => {
-      // Beim Speichern als Bild bleibt das Motiv, damit es in mehreren Stufen gespeichert werden kann
-      const created = await this.generate(false);
+      const created = this.currentCreated();
       if (!created) return;
       const { parsed, result } = created;
       const difficulty = result.quality === 'logic' ? result.level : null;
-      const names = await downloadPuzzleImages(parsed.puzzle, parsed.puzzle.solution, difficulty);
-      this.savedCount++;
-      const levelNames = LEVEL_NAMES;
-      const level = difficulty ? `, Stufe ${levelNames[difficulty]}` : ', braucht Ausprobieren';
-      const requested = this.levelIn.value as GeneratorLevel;
-      const mismatch = difficulty && difficulty !== requested
-        ? ` Achtung: gewünscht war „${levelNames[requested]}“, dieses Motiv ergibt „${levelNames[difficulty]}“.`
-        : '';
+      const names = await downloadPuzzleImages(parsed.puzzle, parsed.puzzle.solution,
+        difficulty ? { level: difficulty, comparisons: result.comparisons } : null);
+      if (this.source === 'motif') this.savedSeed = this.motifSeed;
       const next = this.source === 'motif' ? ' Für ein anderes Motiv klicke „Neues Motiv“.' : '';
-      // Motiv bleibt bestehen, damit es z. B. in weiteren Stufen gespeichert werden kann
-      this.say(`Gespeichert: ${names.join(' und ')} (${result.clueCount} Zahlen${level}). Bisher ${this.savedCount} Rätsel in diesem Dialog.${mismatch}${next}`, !!mismatch);
+      const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]}` : names[0];
+      this.say(`Gespeichert: ${list}.${next}`);
     });
+  }
+
+  /** Lädt das erstellte Rätsel ins Spielfeld und schließt den Dialog. */
+  private play(): void {
+    const created = this.currentCreated();
+    if (!created || this.busy) return;
+    this.created = null;
+    this.updateActions();
+    this.dlg.close();
+    this.onCreate(created);
+    this.prepareNextMotif();
   }
 }
