@@ -1,6 +1,6 @@
 import { canReachLevel, compareLevels, isDeadly, type GenerateResult, type GeneratorLevel } from '../core/generator';
 import { GeneratorClient } from '../core/generatorClient';
-import { MOTIF_KINDS, generateMotif, motifLabel, type MotifKind } from '../core/motifs';
+import { MOTIF_KINDS, generateMotif, motifLabel, type MotifInfo, type MotifKind } from '../core/motifs';
 import { generateForLevel, puzzleFromPattern, type CreatedPuzzle, type RandomPuzzleOptions } from '../core/puzzleFactory';
 import { newSeed } from '../core/random';
 import { downloadPuzzleImages } from '../io/imageExport';
@@ -59,6 +59,8 @@ export class CreatorDialog {
   private lum: Float32Array | null = null;
   private motifSeed = newSeed();
   private motifKind: MotifKind = 'blobs';
+  /** Name und Lizenzhinweis bei Motiven aus Vorlagen (Piktogramme, Pixel-Art). */
+  private motifInfo: MotifInfo = {};
   private cols = DEFAULT_SIZE;
   private rows = DEFAULT_SIZE;
   private pattern: Uint8Array = new Uint8Array(DEFAULT_SIZE * DEFAULT_SIZE);
@@ -183,7 +185,8 @@ export class CreatorDialog {
   private motifTitle(): string {
     const text = this.textIn.value.trim();
     if (this.motifKind === 'letters' && text) return text;
-    return `${motifLabel(this.motifKind)} ${String(this.motifSeed % 10000).padStart(4, '0')}`;
+    const name = this.motifInfo.name ?? motifLabel(this.motifKind);
+    return `${name} ${String(this.motifSeed % 10000).padStart(4, '0')}`;
   }
 
   private setAutoTitle(title: string): void {
@@ -250,6 +253,7 @@ export class CreatorDialog {
       const motif = generateMotif(this.kindIn.value as MotifKind | 'any', this.cols, this.rows, this.motifSeed,
         { text: this.textIn.value });
       this.motifKind = motif.kind;
+      this.motifInfo = { name: motif.name, credit: motif.credit };
       p = Uint8Array.from(motif.pattern);
     } else if (this.lum && !this.blank) {
       p = toPattern(this.lum, Number(this.thrIn.value), this.invIn.checked);
@@ -483,12 +487,14 @@ export class CreatorDialog {
     }
     const title = this.titleIn.value.trim() || 'Eigenes Motiv';
     const source = this.source === 'motif'
-      ? `Zufallsmotiv (${this.motifKind}, Startwert ${this.motifSeed})`
+      ? `Zufallsmotiv (${this.motifKind}, Startwert ${this.motifSeed})${this.motifInfo.credit ? `; Vorlage: ${this.motifInfo.credit}` : ''}`
       : 'Mit dem Mosaik-Ersteller aus einem Bild erzeugt';
     const note = replaced
       ? ` Das zuerst gezeigte Motiv ließ sich nicht als „${LEVEL_NAMES[level]}“ lösen, deshalb wurde ein anderes verwendet.`
       : undefined;
-    return { parsed: puzzleFromPattern(this.cols, this.rows, Uint8Array.from(this.pattern), result, title, source), result, note };
+    // Lizenzhinweis der Vorlage erscheint in der App unter „Autor“
+    const author = this.source === 'motif' && this.motifInfo.credit ? `Vorlage: ${this.motifInfo.credit}` : '';
+    return { parsed: puzzleFromPattern(this.cols, this.rows, Uint8Array.from(this.pattern), result, title, source, author), result, note };
   }
 
   /** Nach dem Spielen eines Zufallsmotivs für das nächste Öffnen ein frisches bereitstellen. */

@@ -32,12 +32,12 @@ export async function generateForLevel(client: GeneratorClient, width: number, h
 
 /** Baut aus Raster und erzeugten Zahlen ein ladbares Rätsel (mit Lösung). */
 export function puzzleFromPattern(width: number, height: number, pattern: Uint8Array,
-  result: GenerateResult, title: string, source: string): ParsedFile {
+  result: GenerateResult, title: string, source: string, author = ''): ParsedFile {
   return {
     puzzle: {
       width, height, clues: result.clues,
       solution: Uint8Array.from(pattern, v => (v ? Cell.Filled : Cell.Empty)),
-      title, author: '',
+      title, author,
       extra: result.quality === 'logic'
         ? { source, difficulty: result.level, clueCount: result.clueCount, comparisons: result.comparisons }
         : { source }
@@ -78,9 +78,12 @@ export async function createRandomPuzzle(client: GeneratorClient, opts: RandomPu
       f => opts.onProgress?.((attempt - 1 + f) / attempt));
     const text = opts.text?.trim();
     const title = motif.kind === 'letters' && text ? text
-      : `${motifLabel(motif.kind)} ${String(motif.seed % 10000).padStart(4, '0')}`;
+      : `${motif.name ?? motifLabel(motif.kind)} ${String(motif.seed % 10000).padStart(4, '0')}`;
+    const credit = motif.credit ? `; Vorlage: ${motif.credit}` : '';
     const created = {
-      parsed: puzzleFromPattern(opts.width, opts.height, motif.pattern, result, title, `Zufallsmotiv (${motif.kind}, Startwert ${motif.seed})`),
+      parsed: puzzleFromPattern(opts.width, opts.height, motif.pattern, result, title, `Zufallsmotiv (${motif.kind}, Startwert ${motif.seed})${credit}`,
+        // Lizenzhinweis der Vorlage erscheint in der App unter „Autor“
+        motif.credit ? `Vorlage: ${motif.credit}` : ''),
       result
     };
     if (result.quality === 'logic' && result.level === opts.level) return created;

@@ -1,13 +1,16 @@
+import { PICTOGRAMS, type Pictogram } from '../data/pictograms';
 import { GLYPH_H, GLYPH_W, glyphPixel, lineWidth, normalizeText } from './pixelFont';
 import { createRng, pick, randInt, randRange, type Rng } from './random';
 import { SILHOUETTES } from './silhouettes';
 
 /**
- * Motiv-Generator: entwirft Schwarz-Weiß-Bilder ohne Vorlage.
+ * Motiv-Generator: entwirft Schwarz-Weiß-Bilder ohne Vorlage
+ * (bzw. aus frei lizenzierten Vorlagen bei „Piktogramme“ und „Pixel-Art“).
  * Alle Funktionen sind deterministisch (gleicher Startwert → gleiches Motiv).
  */
 export type MotifKind = 'blobs' | 'sprite' | 'shapes' | 'waves' | 'mandala' | 'maze'
-  | 'landscape' | 'caves' | 'snowflake' | 'tiles' | 'spiral' | 'figures' | 'letters' | 'opart';
+  | 'landscape' | 'caves' | 'snowflake' | 'tiles' | 'spiral' | 'figures' | 'letters' | 'opart'
+  | 'icons' | 'pixelart';
 
 export const MOTIF_KINDS: readonly { kind: MotifKind; label: string }[] = [
   { kind: 'blobs', label: 'Kleckse' },
@@ -23,7 +26,9 @@ export const MOTIF_KINDS: readonly { kind: MotifKind; label: string }[] = [
   { kind: 'spiral', label: 'Spirale' },
   { kind: 'figures', label: 'Figuren' },
   { kind: 'letters', label: 'Buchstaben' },
-  { kind: 'opart', label: 'Op-Art' }
+  { kind: 'opart', label: 'Op-Art' },
+  { kind: 'icons', label: 'Piktogramme' },
+  { kind: 'pixelart', label: 'Pixel-Art' }
 ];
 
 /** Zusätzliche Angaben für einzelne Motivarten. */
@@ -35,7 +40,15 @@ export interface MotifOptions {
 export const motifLabel = (kind: MotifKind): string =>
   MOTIF_KINDS.find(m => m.kind === kind)?.label ?? kind;
 
-export interface Motif {
+/** Angaben zu Vorlagen: Name des Motivs und Lizenznachweis. */
+export interface MotifInfo {
+  /** Name der dargestellten Figur, z. B. „Katze“ (für den Titel). */
+  name?: string;
+  /** Urheber- und Lizenzhinweis der Vorlage. */
+  credit?: string;
+}
+
+export interface Motif extends MotifInfo {
   kind: MotifKind;
   seed: number;
   pattern: Uint8Array;
@@ -45,8 +58,10 @@ export interface Motif {
 const MIN_FILL = 0.2, MAX_FILL = 0.72;
 /** Labyrinthe bestehen überwiegend aus Wänden und dürfen dunkler sein. */
 const MAX_FILL_BY_KIND: Partial<Record<MotifKind, number>> = { maze: 0.9 };
+/** Vorlagen sind bewusst nicht so stark gefüllt und dürfen heller sein. */
+const MIN_FILL_BY_KIND: Partial<Record<MotifKind, number>> = { icons: 0.11, pixelart: 0.11 };
 
-type Painter = (w: number, h: number, rnd: Rng, opts: MotifOptions) => Uint8Array;
+type Painter = (w: number, h: number, rnd: Rng, opts: MotifOptions, info: MotifInfo) => Uint8Array;
 
 /* ---------- Symmetrie-Helfer ---------- */
 
@@ -557,8 +572,101 @@ const opart: Painter = (w, h, rnd) => {
   return p;
 };
 
+/* ---------- Vorlagen (Piktogramme, Pixel-Art) ---------- */
+
+const decoded = new Map<Pictogram, Uint8Array>();
+
+/** Bitfolge einer Vorlage entpacken (w × h, 1 = gefüllt). */
+function decodePictogram(pg: Pictogram): Uint8Array {
+  let bits = decoded.get(pg);
+  if (bits) return bits;
+  const raw = atob(pg.data);
+  bits = new Uint8Array(pg.w * pg.h);
+  for (let k = 0; k < bits.length; k++) bits[k] = (raw.charCodeAt(k >> 3) >> (7 - (k & 7))) & 1;
+  decoded.set(pg, bits);
+  return bits;
+}
+
+/**
+ * Vorlage in den Bereich (x0, y0, bw × bh) einpassen: unverzerrt, mittig, auf Wunsch gespiegelt.
+ * integer: Pixel-Art nur in ganzzahligen Vielfachen vergrößern, damit die Pixel gleich groß bleiben.
+ */
+function drawPictogram(p: Uint8Array, w: number, pg: Pictogram, x0: number, y0: number, bw: number, bh: number,
+  flip: boolean, integer: boolean): void {
+  const src = decodePictogram(pg);
+  let f = Math.min(bw / pg.w, bh / pg.h);
+  if (integer && f >= 1) f = Math.floor(f);
+  const tw = Math.max(1, Math.round(pg.w * f)), th = Math.max(1, Math.round(pg.h * f));
+  const ox = x0 + Math.floor((bw - tw) / 2), oy = y0 + Math.floor((bh - th) / 2);
+  const S = 4; // Abtastpunkte je Richtung und Feld
+  for (let ty = 0; ty < th; ty++) for (let tx = 0; tx < tw; tx++) {
+    let hit = 0;
+    for (let sy = 0; sy < S; sy++) for (let sx = 0; sx < S; sx++) {
+      const u = Math.min(pg.w - 1, Math.floor(((tx + (sx + 0.5) / S) * pg.w) / tw));
+      const v = Math.min(pg.h - 1, Math.floor(((ty + (sy + 0.5) / S) * pg.h) / th));
+      hit += src[v * pg.w + (flip ? pg.w - 1 - u : u)];
+    }
+    if (hit * 2 >= S * S) p[(oy + ty) * w + ox + tx] = 1;
+  }
+}
+
+const ICON_SET = PICTOGRAMS.filter(pg => pg.set === 'icons');
+const PIXEL_SET = PICTOGRAMS.filter(pg => pg.set === 'pixelart');
+
+const iconCredit = (pg: Pictogram) => `„${pg.name}“ von ${pg.author}, game-icons.net (CC BY 3.0)`;
+const pixelCredit = (pg: Pictogram) => `„${pg.name}“ aus dem 1-Bit Pack von Kenney, kenney.nl (CC0)`;
+
+/** Vier Viertel in zufälliger Reihenfolge (für Gruppen mehrerer Vorlagen). */
+function shuffledQuadrants(rnd: Rng): [number, number][] {
+  const q: [number, number][] = [[0, 0], [1, 0], [0, 1], [1, 1]];
+  for (let i = q.length - 1; i > 0; i--) { const j = randInt(rnd, 0, i); [q[i], q[j]] = [q[j], q[i]]; }
+  return q;
+}
+
+/** Piktogramme (game-icons.net): ein großes Symbol oder ab 44 Feldern auch eine Gruppe. */
+const icons: Painter = (w, h, rnd, _opts, info) => {
+  const p = new Uint8Array(w * h);
+  const m = Math.min(w, h);
+  // Kleinere Gruppen-Symbole wären nicht mehr zu erkennen
+  if (m >= 44 && rnd() < 0.3) {
+    const n = randInt(rnd, 2, 4), used = shuffledQuadrants(rnd).slice(0, n);
+    const hw = Math.floor(w / 2), hh = Math.floor(h / 2), pad = 1;
+    const chosen = used.map(() => pick(rnd, ICON_SET));
+    used.forEach(([qx, qy], k) =>
+      drawPictogram(p, w, chosen[k], qx * hw + pad, qy * hh + pad, hw - 2 * pad, hh - 2 * pad, rnd() < 0.5, false));
+    info.credit = chosen.map(iconCredit).join('; ');
+    return p;
+  }
+  const pg = pick(rnd, ICON_SET), size = Math.round(randRange(rnd, 0.84, 0.96) * m);
+  drawPictogram(p, w, pg, Math.floor((w - size) / 2), Math.floor((h - size) / 2), size, size, rnd() < 0.5, false);
+  info.name = pg.name;
+  info.credit = iconCredit(pg);
+  return p;
+};
+
+/** Pixel-Art (Kenney, 1-Bit Pack): ganzzahlig vergrößert, ab genügend Platz auch mehrere Figuren. */
+const pixelart: Painter = (w, h, rnd, _opts, info) => {
+  const p = new Uint8Array(w * h);
+  const m = Math.min(w, h);
+  if (m >= 36 && rnd() < 0.35) {
+    const n = randInt(rnd, 2, 4), used = shuffledQuadrants(rnd).slice(0, n);
+    const hw = Math.floor(w / 2), hh = Math.floor(h / 2), pad = 1;
+    const chosen = used.map(() => pick(rnd, PIXEL_SET));
+    used.forEach(([qx, qy], k) =>
+      drawPictogram(p, w, chosen[k], qx * hw + pad, qy * hh + pad, hw - 2 * pad, hh - 2 * pad, rnd() < 0.5, true));
+    info.credit = chosen.map(pixelCredit).join('; ');
+    return p;
+  }
+  const pg = pick(rnd, PIXEL_SET);
+  drawPictogram(p, w, pg, 1, 1, w - 2, h - 2, rnd() < 0.5, true);
+  info.name = pg.name;
+  info.credit = pixelCredit(pg);
+  return p;
+};
+
 const PAINTERS: Record<MotifKind, Painter> = {
-  blobs, sprite, shapes, waves, mandala, maze, landscape, caves, snowflake, tiles, spiral, figures, letters, opart
+  blobs, sprite, shapes, waves, mandala, maze, landscape, caves, snowflake, tiles, spiral, figures, letters, opart,
+  icons, pixelart
 };
 
 const fillOf = (p: Uint8Array) => p.reduce((s, v) => s + v, 0) / p.length;
@@ -574,12 +682,14 @@ export function generateMotif(kind: MotifKind | 'any', width: number, height: nu
   for (let attempt = 0; attempt < 12; attempt++) {
     const k = kind === 'any' ? pick(chooser, MOTIF_KINDS).kind : kind;
     const s = (seed + attempt * 7919) >>> 0;
-    const pattern = PAINTERS[k](width, height, createRng(s), opts);
+    const info: MotifInfo = {};
+    const pattern = PAINTERS[k](width, height, createRng(s), opts, info);
     const fill = fillOf(pattern);
-    const maxFill = MAX_FILL_BY_KIND[k] ?? MAX_FILL;
-    if (fill >= MIN_FILL && fill <= maxFill) return { kind: k, seed: s, pattern };
-    const dist = fill < MIN_FILL ? MIN_FILL - fill : fill - maxFill;
-    if (dist < bestDist) { bestDist = dist; best = { kind: k, seed: s, pattern }; }
+    const minFill = MIN_FILL_BY_KIND[k] ?? MIN_FILL, maxFill = MAX_FILL_BY_KIND[k] ?? MAX_FILL;
+    const motif: Motif = { kind: k, seed: s, pattern, ...info };
+    if (fill >= minFill && fill <= maxFill) return motif;
+    const dist = fill < minFill ? minFill - fill : fill - maxFill;
+    if (dist < bestDist) { bestDist = dist; best = motif; }
   }
   return best!;
 }

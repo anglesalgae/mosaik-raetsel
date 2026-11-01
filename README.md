@@ -323,6 +323,7 @@ src/
     motifs.ts             Motiv-Generator (Kleckse, Labyrinth, Landschaft, Figuren, Buchstaben …)
     silhouettes.ts        Formen für das Motiv „Figuren“
     pixelFont.ts          Pixelschrift 5 × 7 für das Motiv „Buchstaben“
+  data/pictograms.ts      Vorlagen für „Piktogramme“ und „Pixel-Art“ (erzeugt mit scripts/pictograms/)
     puzzleFactory.ts      Zufallsrätsel erzeugen, Rätsel aus Raster zusammensetzen
     random.ts             Reproduzierbarer Zufallsgenerator
     emitter.ts            Typisierter Event-Emitter
@@ -389,6 +390,10 @@ Motivarten:
 | Figuren | Silhouetten von Herz, Stern, Haus, Fisch, Katze, Vogel, Tasse, Baum, Mond, Apfel und Pilz – einzeln groß oder als Gruppe |
 | Buchstaben | Eigener Text (Feld „Text“) oder ein zufälliges Wort in Blockschrift, teils mit Rahmen; zu langer Text wird am Rand abgeschnitten |
 | Op-Art | Streifen, Ringe oder Schachbrett, von einer „Linse“ verzerrt |
+| Piktogramme | 162 Symbole von game-icons.net (Tiere, Pflanzen, Essen, Fahrzeuge, Gebäude, Gegenstände), CC BY 3.0; ab 44 Feldern auch als Gruppe |
+| Pixel-Art | 62 Figuren aus dem „1-Bit Pack“ von Kenney (CC0), in ganzzahligen Vielfachen vergrößert; ab 36 Feldern auch als Gruppe |
+
+Piktogramme und Pixel-Art beruhen auf frei lizenzierten Vorlagen. Urheber und Lizenz stehen in der App im Bereich „Info“ unter „Autor“ und in [VORLAGEN-LIZENZEN.md](VORLAGEN-LIZENZEN.md).
 
 Jedes Motiv wird aus einem Startwert erzeugt und ist damit reproduzierbar; er steht in der gespeicherten Datei unter `source`. Ergibt ein Motiv kein eindeutig lösbares Rätsel, versucht die App automatisch ein anderes.
 
