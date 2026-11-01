@@ -1,4 +1,4 @@
-import { canReachLevel, compareLevels, type GenerateResult, type GeneratorLevel } from '../core/generator';
+import { canReachLevel, compareLevels, isDeadly, type GenerateResult, type GeneratorLevel } from '../core/generator';
 import { GeneratorClient } from '../core/generatorClient';
 import { MOTIF_KINDS, generateMotif, motifLabel, type MotifKind } from '../core/motifs';
 import { generateForLevel, puzzleFromPattern, type CreatedPuzzle, type RandomPuzzleOptions } from '../core/puzzleFactory';
@@ -527,7 +527,10 @@ export class CreatorDialog {
       const { result } = created;
       const difficulty = result.quality === 'logic' ? result.level : null;
       const comparisons = result.comparisons === 1 ? '1 Vergleich' : `${result.comparisons} Vergleiche`;
-      const level = difficulty ? `Stufe ${LEVEL_NAMES[difficulty]}, ${comparisons}` : 'braucht Ausprobieren';
+      // Besonders viele Vergleiche (Totenschädel im Bild): als „Profi“ ausweisen
+      const levelName = difficulty && isDeadly(result.comparisons, result.clueCount) ? 'Profi'
+        : difficulty ? LEVEL_NAMES[difficulty] : '';
+      const level = difficulty ? `Stufe ${levelName}, ${comparisons}` : 'braucht Ausprobieren';
       const requested = this.levelIn.value as GeneratorLevel;
       const mismatch = difficulty && difficulty !== requested
         ? ` Achtung: gewünscht war „${LEVEL_NAMES[requested]}“, dieses Motiv ergibt „${LEVEL_NAMES[difficulty]}“.`

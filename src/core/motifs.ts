@@ -310,36 +310,68 @@ function segmentDistance(px: number, py: number, ax: number, ay: number, bx: num
   return Math.hypot(px - ax - t * dx, py - ay - t * dy);
 }
 
-/** Schneeflocke bzw. Kristall: sechs- oder achtfach symmetrische Äste mit Seitenzweigen. */
+/**
+ * Schneeflocke bzw. Kristall: sechs- oder achtfach symmetrische Äste mit Seitenzweigen.
+ * Damit nicht immer ein Ast als Strich senkrecht durch die Mitte läuft, ist die Flocke
+ * zufällig gedreht; Astlänge, Kern (Scheibe, Ring, Vieleck oder Lücke) und Astspitzen variieren.
+ */
 const snowflake: Painter = (w, h, rnd) => {
   const p = new Uint8Array(w * h);
-  const folds = pick(rnd, [6, 6, 8] as const);
+  const folds = pick(rnd, [6, 6, 8] as const), step = (2 * Math.PI) / folds;
   const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 0.5;
-  const thick = Math.max(0.7, R * randRange(rnd, 0.06, 0.1));
+  const r0 = rnd();
+  const rotation = r0 < 0.2 ? Math.PI / 2 : r0 < 0.45 ? Math.PI / 2 + step / 2 : randRange(rnd, 0, step);
+  const armLen = randRange(rnd, 0.62, 0.98);
+  // Hauptast und Zweige mindestens etwa ein Feld breit, Zweige etwas dünner
+  const tMain = Math.max(0.6, R * randRange(rnd, 0.045, 0.085));
+  const tBranch = Math.max(0.55, tMain * randRange(rnd, 0.65, 0.9));
+  // Manchmal beginnen die Äste erst ein Stück außerhalb des Kerns (Lücke)
+  const start = rnd() < 0.35 ? randRange(rnd, 0.28, 0.42) : 0;
+  const coreKind = start ? pick(rnd, ['disc', 'ring'] as const) : pick(rnd, ['disc', 'ring', 'polygon', 'none'] as const);
+  const coreR = (start ? start * randRange(rnd, 0.5, 0.7) : randRange(rnd, 0.12, 0.28)) * R;
   const branchAngle = folds === 6 ? Math.PI / 3 : Math.PI / 4;
-  const branches = Array.from({ length: randInt(rnd, 1, 3) }, () =>
-    ({ t: randRange(rnd, 0.3, 0.8), len: randRange(rnd, 0.15, 0.4) }));
-  const core = randRange(rnd, 0.1, 0.25) * R;
-  // Strecken eines Astes (Richtung 0), dann für alle Äste gedreht
-  const arm: [number, number, number, number][] = [[0, 0, 1, 0]];
+  const from = Math.max(start + 0.12, 0.3), to = armLen - 0.12;
+  const branches = Array.from({ length: to > from ? randInt(rnd, 1, 3) : 0 }, () =>
+    ({ t: randRange(rnd, from, to), len: randRange(rnd, 0.12, 0.34) }));
+  const tip = pick(rnd, ['none', 'diamond', 'fork'] as const), tipSize = randRange(rnd, 0.08, 0.14);
+
+  // Strecken eines Astes in Ast-Koordinaten (u entlang des Astes, v quer dazu, Einheit R)
+  const arm: [number, number, number, number, number][] = [[start, 0, armLen, 0, tMain]];
   for (const b of branches) {
     for (const sgn of [-1, 1]) {
-      arm.push([b.t, 0, b.t + b.len * Math.cos(branchAngle), sgn * b.len * Math.sin(branchAngle)]);
+      arm.push([b.t, 0, b.t + b.len * Math.cos(branchAngle), sgn * b.len * Math.sin(branchAngle), tBranch]);
     }
   }
-  const segs: [number, number, number, number][] = [];
-  for (let k = 0; k < folds; k++) {
-    const a = (2 * Math.PI * k) / folds + Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
-    for (const [x0, y0, x1, y1] of arm) {
-      segs.push([cx + R * (x0 * c - y0 * s), cy + R * (x0 * s + y0 * c), cx + R * (x1 * c - y1 * s), cy + R * (x1 * s + y1 * c)]);
+  if (tip === 'fork') {
+    for (const sgn of [-1, 1]) {
+      arm.push([armLen - tipSize, 0, armLen + tipSize * 0.4, sgn * tipSize * 1.2, tBranch]);
     }
   }
+  const axes = Array.from({ length: folds }, (_, k) => {
+    const a = rotation + k * step;
+    return { c: Math.cos(a), s: Math.sin(a) };
+  });
+
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const px = x + 0.5, py = y + 0.5;
-    if (Math.hypot(px - cx, py - cy) <= core) { p[y * w + x] = 1; continue; }
-    for (const [ax, ay, bx, by] of segs) {
-      if (segmentDistance(px, py, ax, ay, bx, by) <= thick) { p[y * w + x] = 1; break; }
+    const dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = Math.hypot(dx, dy);
+    let on = false;
+    if (coreKind === 'disc') on = d <= coreR;
+    else if (coreKind === 'ring') on = d <= coreR && d >= coreR - Math.max(1, coreR * 0.4);
+    else if (coreKind === 'polygon') {
+      // Regelmäßiges Vieleck mit so vielen Ecken wie Äste, Ecken auf den Ästen
+      const t = Math.atan2(dy, dx) - rotation;
+      const local = t - step * Math.floor(t / step) - step / 2;
+      on = d * Math.cos(local) <= coreR * Math.cos(step / 2);
     }
+    for (let k = 0; !on && k < folds; k++) {
+      const { c, s } = axes[k];
+      const u = (dx * c + dy * s) / R, v = (-dx * s + dy * c) / R;
+      if (tip === 'diamond' && Math.abs(u - armLen) / (tipSize * 1.4) + Math.abs(v) / tipSize <= 1) on = true;
+      for (const [u0, v0, u1, v1, t] of arm) {
+        if (segmentDistance(u, v, u0, v0, u1, v1) * R <= t) { on = true; break; }
+      }
+    }
+    if (on) p[y * w + x] = 1;
   }
   return p;
 };
